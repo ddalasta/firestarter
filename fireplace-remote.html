@@ -77,11 +77,16 @@
   .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
   .chip { padding: 10px 16px; font-size: 17px; border-radius: 999px; font-weight: 500; }
   .chip.bulb { font-size: 15px; opacity: .85; }
-  #bulbs { gap: 7px; }
-  #bulbs .chip { padding: 8px 13px; font-size: 15px; }
-  .bulbhead { flex-basis: 100%; color: var(--muted); font-size: 12px; text-transform: uppercase;
-    letter-spacing: 1px; margin: 6px 0 -2px 4px; }
-  .bulbhead:first-child { margin-top: 0; }
+  /* room + light dropdowns */
+  .pickrow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .pickrow label { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .pickrow span { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; margin-left: 4px; }
+  .pickrow select { -webkit-appearance: none; appearance: none; width: 100%; font: inherit; font-size: 17px;
+    font-weight: 600; color: var(--text); color-scheme: dark; cursor: pointer;
+    background: var(--panel-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath d='M1.5 1.5l5.5 5.5 5.5-5.5' fill='none' stroke='%23ffd6aa' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center;
+    border: 2px solid var(--glow); border-radius: 14px; padding: 12px 38px 12px 14px;
+    box-shadow: 0 4px 0 rgba(0,0,0,.75), 0 0 4px 0 var(--glow), 0 0 12px 2px var(--glow-soft);
+    text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
   .chip.on { opacity: 1; }
 
   /* color presets */
@@ -323,8 +328,10 @@
       <button id="tokenSave">Save</button>
     </div>
   </div>
-  <div class="chips" id="rooms"></div>
-  <div class="chips" id="bulbs"></div>
+  <div class="pickrow">
+    <label><span>Room</span><select id="roomSel"></select></label>
+    <label><span>Light</span><select id="bulbSel"></select></label>
+  </div>
 
   <div class="powerrow">
     <button id="lon">On</button>
@@ -529,59 +536,60 @@ function markMode(mode) {
   $("kelvin").classList.toggle("dim", mode === "color");
 }
 
-// ---------- room & bulb chips ----------
-// Rooms on top. Under them, only the bulbs in the picked room
-// ("All lights" shows every bulb, grouped under little room headings).
-// Offline bulbs are hidden.
+// ---------- room & light dropdowns ----------
+// "Room" picks a room (or All lights). "Light" then lists just that room's bulbs,
+// with "Whole room" first. Offline bulbs are hidden.
 var onlineLights = [];    // connected bulbs only
-var shownRoom = "all";    // which room's bulbs are listed right now
-function chip(label, sel, cls, parent, onTap) {
-  var b = document.createElement("button");
-  b.className = "chip " + (cls || "");
-  b.textContent = label;
-  b.setAttribute("data-sel", sel);
-  b.addEventListener("click", function () { pick(sel); if (onTap) onTap(); });
-  parent.appendChild(b);
-}
-function pick(sel) {
-  selector = sel;
-  each(".chip", function (c) { c.classList.toggle("on", c.getAttribute("data-sel") === sel); });
-}
 function roomOf(l) { return (l.group && l.group.name) || "Other"; }
-function showBulbs(room) {
-  shownRoom = room;
-  var box = $("bulbs");
-  box.innerHTML = "";
-  if (room === "all") {
-    roomList().forEach(function (name) {
-      var inRoom = onlineLights.filter(function (l) { return roomOf(l) === name; });
-      if (!inRoom.length) return;
-      var head = document.createElement("div");
-      head.className = "bulbhead"; head.textContent = name;
-      box.appendChild(head);
-      inRoom.forEach(function (l) { chip(l.label || "Light", "id:" + l.id, "bulb", box); });
-    });
-  } else {
-    onlineLights.filter(function (l) { return roomOf(l) === room; })
-      .forEach(function (l) { chip(l.label || "Light", "id:" + l.id, "bulb", box); });
-  }
-  pick(selector);   // keep the glow on whatever is picked
-}
 function roomList() {
   var rooms = [];
   onlineLights.forEach(function (l) { var n = roomOf(l); if (rooms.indexOf(n) === -1) rooms.push(n); });
   return rooms.sort();
 }
+function opt(parent, value, text) {
+  var o = document.createElement("option");
+  o.value = value; o.textContent = text;
+  parent.appendChild(o);
+}
+function fillBulbs(room) {
+  var sel = $("bulbSel");
+  sel.innerHTML = "";
+  if (room === "all") {
+    opt(sel, "all", "Every light");
+    roomList().forEach(function (name) {
+      var g = document.createElement("optgroup");
+      g.label = name;
+      onlineLights.filter(function (l) { return roomOf(l) === name; })
+        .forEach(function (l) { opt(g, "id:" + l.id, l.label || "Light"); });
+      if (g.children.length) sel.appendChild(g);
+    });
+  } else {
+    opt(sel, "group:" + room, "Whole room");
+    onlineLights.filter(function (l) { return roomOf(l) === room; })
+      .forEach(function (l) { opt(sel, "id:" + l.id, l.label || "Light"); });
+  }
+  sel.value = sel.options[0].value;
+}
+// set what the light controls act on, and keep the dropdowns showing it
+function pick(sel) {
+  selector = sel;
+  if ($("bulbSel").querySelector('option[value="' + sel + '"]')) $("bulbSel").value = sel;
+}
+$("roomSel").addEventListener("change", function () {
+  var room = this.value;
+  fillBulbs(room);
+  pick($("bulbSel").value);
+});
+$("bulbSel").addEventListener("change", function () { pick(this.value); });
 function buildRooms(rooms) {
-  var r = $("rooms");
+  var r = $("roomSel");
   r.innerHTML = "";
-  chip("All lights", "all", "", r, function () { showBulbs("all"); });
-  rooms.forEach(function (name) {
-    chip(name, "group:" + name, "", r, function () { showBulbs(name); });
-  });
+  opt(r, "all", "All lights");
+  rooms.forEach(function (name) { opt(r, name, name); });
   var start = rooms.indexOf(FIRE_ROOM) !== -1 ? FIRE_ROOM : "all";
-  selector = start === "all" ? "all" : "group:" + start;
-  showBulbs(start);
+  r.value = start;
+  fillBulbs(start);
+  pick($("bulbSel").value);
 }
 function loadLights() {
   if (!lifxReady) {
