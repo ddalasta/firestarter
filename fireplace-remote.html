@@ -77,7 +77,11 @@
   .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
   .chip { padding: 10px 16px; font-size: 17px; border-radius: 999px; font-weight: 500; }
   .chip.bulb { font-size: 15px; opacity: .85; }
-  .chip.offline { opacity: .4; }
+  #bulbs { gap: 7px; }
+  #bulbs .chip { padding: 8px 13px; font-size: 15px; }
+  .bulbhead { flex-basis: 100%; color: var(--muted); font-size: 12px; text-transform: uppercase;
+    letter-spacing: 1px; margin: 6px 0 -2px 4px; }
+  .bulbhead:first-child { margin-top: 0; }
   .chip.on { opacity: 1; }
 
   /* color presets */
@@ -526,47 +530,75 @@ function markMode(mode) {
 }
 
 // ---------- room & bulb chips ----------
-function chip(label, sel, cls, parent) {
+// Rooms on top. Under them, only the bulbs in the picked room
+// ("All lights" shows every bulb, grouped under little room headings).
+// Offline bulbs are hidden.
+var onlineLights = [];    // connected bulbs only
+var shownRoom = "all";    // which room's bulbs are listed right now
+function chip(label, sel, cls, parent, onTap) {
   var b = document.createElement("button");
   b.className = "chip " + (cls || "");
   b.textContent = label;
   b.setAttribute("data-sel", sel);
-  b.addEventListener("click", function () { pick(sel); });
+  b.addEventListener("click", function () { pick(sel); if (onTap) onTap(); });
   parent.appendChild(b);
 }
 function pick(sel) {
   selector = sel;
   each(".chip", function (c) { c.classList.toggle("on", c.getAttribute("data-sel") === sel); });
 }
-function buildRooms(rooms, bulbs) {
-  var r = $("rooms"), b = $("bulbs");
-  r.innerHTML = ""; b.innerHTML = "";
-  chip("All lights", "all", "", r);
-  rooms.forEach(function (name) { chip(name, "group:" + name, "", r); });
-  bulbs.forEach(function (l) {
-    // unplugged / offline bulbs show faded so it's clear why they don't respond
-    chip((l.label || "Unnamed light") + (l.connected === false ? " (offline)" : ""),
-         "id:" + l.id, "bulb" + (l.connected === false ? " offline" : ""), b);
+function roomOf(l) { return (l.group && l.group.name) || "Other"; }
+function showBulbs(room) {
+  shownRoom = room;
+  var box = $("bulbs");
+  box.innerHTML = "";
+  if (room === "all") {
+    roomList().forEach(function (name) {
+      var inRoom = onlineLights.filter(function (l) { return roomOf(l) === name; });
+      if (!inRoom.length) return;
+      var head = document.createElement("div");
+      head.className = "bulbhead"; head.textContent = name;
+      box.appendChild(head);
+      inRoom.forEach(function (l) { chip(l.label || "Light", "id:" + l.id, "bulb", box); });
+    });
+  } else {
+    onlineLights.filter(function (l) { return roomOf(l) === room; })
+      .forEach(function (l) { chip(l.label || "Light", "id:" + l.id, "bulb", box); });
+  }
+  pick(selector);   // keep the glow on whatever is picked
+}
+function roomList() {
+  var rooms = [];
+  onlineLights.forEach(function (l) { var n = roomOf(l); if (rooms.indexOf(n) === -1) rooms.push(n); });
+  return rooms.sort();
+}
+function buildRooms(rooms) {
+  var r = $("rooms");
+  r.innerHTML = "";
+  chip("All lights", "all", "", r, function () { showBulbs("all"); });
+  rooms.forEach(function (name) {
+    chip(name, "group:" + name, "", r, function () { showBulbs(name); });
   });
-  pick(rooms.indexOf(FIRE_ROOM) !== -1 ? "group:" + FIRE_ROOM : "all");
+  var start = rooms.indexOf(FIRE_ROOM) !== -1 ? FIRE_ROOM : "all";
+  selector = start === "all" ? "all" : "group:" + start;
+  showBulbs(start);
 }
 function loadLights() {
   if (!lifxReady) {
     $("tokenSetup").classList.remove("hidden");
-    buildRooms(FALLBACK_ROOMS, []);
+    onlineLights = [];
+    buildRooms(FALLBACK_ROOMS);
     return;
   }
   lifx("GET", "/lights/all").then(function (lights) {
     allLights = lights || [];
-    var rooms = [];
-    (lights || []).forEach(function (l) {
-      if (l.group && l.group.name && rooms.indexOf(l.group.name) === -1) rooms.push(l.group.name);
-    });
-    rooms.sort();
-    buildRooms(rooms.length ? rooms : FALLBACK_ROOMS, lights || []);
+    onlineLights = allLights.filter(function (l) { return l.connected !== false; });
+    var rooms = roomList();
+    buildRooms(rooms.length ? rooms : FALLBACK_ROOMS);
   }).catch(function (e) {
     say(e.message, true);
-    buildRooms(FALLBACK_ROOMS, []);
+    onlineLights = [];
+    buildRooms(FALLBACK_ROOMS);
   });
 }
 
@@ -603,9 +635,9 @@ PRESETS.forEach(function (p) {
 var RAVE_GREEN = "hue:96 saturation:0.85";
 var SOUNDER_BLUE = "hue:207 saturation:1";
 function bulbsIn(sel) {
-  return allLights.filter(function (l) {
+  return onlineLights.filter(function (l) {
     if (sel === "all") return true;
-    if (sel.indexOf("group:") === 0) return l.group && l.group.name === sel.slice(6);
+    if (sel.indexOf("group:") === 0) return roomOf(l) === sel.slice(6);
     if (sel.indexOf("id:") === 0) return l.id === sel.slice(3);
     return false;
   });
