@@ -1,3 +1,7 @@
 # Private project notes stay on this computer
 Firestarter.md
 *.before-delete.html
+
+# ESP32 secrets and build files: never upload
+secrets.yaml
+.esphome/
