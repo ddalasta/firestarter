@@ -73,6 +73,8 @@
   button:active { transform: scale(.96); }
   button.fire { background: linear-gradient(135deg, var(--fire), var(--fire-2)); color: #3a1806; border-color: transparent; }
   button.off { background: #2c2c31; }
+  /* a button the box is making wait (cooldown): dim, and it shows a countdown */
+  button.wait { opacity: .45; filter: saturate(.4); }
   button.scene { padding: 22px 10px; font-size: 20px; }
 
   /* room / bulb chips */
@@ -269,6 +271,64 @@
   .e4 { --dx: 7px; animation-delay: 2.3s; }
   @media (prefers-reduced-motion: reduce) { .fx, .fs-glow, .ember { animation: none; } }
 
+  /* ----- lighting the fire: plays in the same little scene while the fireplace lights -----
+     The page adds "lighting", then st1..st6 one after another:
+     st1 first log drops in, st2 second log, st3 matchbox + match (strike, carry to the logs),
+     st4 first tiny flame, st5 it grows, st6 full fire. --k stretches it if lighting isn't 60 s. */
+  .log, #flameWrap, .mbox, .match { transform-box: view-box; }
+  #flameWrap { transform-origin: 100px 88px; }
+  .hearth { opacity: .55; }
+  .matchkit { display: none; }
+  .firescene.lighting .log { opacity: 0; transform-origin: 100px 90px; transform: translateY(-92px) rotate(-16deg); }
+  .firescene.lighting .l2 { transform: translateY(-92px) rotate(16deg); }
+  .firescene.lighting.st1 .l1, .firescene.lighting.st2 .l2 { opacity: 1; transform: none;
+    transition: transform .85s cubic-bezier(.45, 1.45, .6, 1), opacity .2s; }
+  .firescene.lighting #flameWrap { transform: scale(0); }
+  .firescene.lighting.st4 #flameWrap { transform: scale(.2); transition: transform 1.4s ease-out; }
+  .firescene.lighting.st5 #flameWrap { transform: scale(.5); transition: transform calc(10s * var(--k, 1)) ease-in-out; }
+  .firescene.lighting.st6 #flameWrap { transform: scale(1); transition: transform calc(11s * var(--k, 1)) ease-in-out; }
+  .firescene.lighting .glowwrap, .firescene.lighting .hearth { opacity: 0; transition: opacity 3s ease; }
+  .firescene.lighting.st4 .glowwrap { opacity: .22; }
+  .firescene.lighting.st4 .hearth { opacity: .2; }
+  .firescene.lighting.st5 .glowwrap { opacity: .55; }
+  .firescene.lighting.st5 .hearth { opacity: .38; }
+  .firescene.lighting.st6 .glowwrap { opacity: 1; }
+  .firescene.lighting.st6 .hearth { opacity: .55; }
+  .firescene.lighting:not(.st6) .ember { visibility: hidden; }
+  .firescene.lighting.st3:not(.nomatch) .matchkit { display: block; }
+  .firescene.lighting.st3 .mbox { animation: mboxIn calc(10s * var(--k, 1)) ease both; }
+  .firescene.lighting.st3 .match { animation: matchGo calc(10s * var(--k, 1)) ease-in-out both; }
+  .firescene.lighting.st3 .mflame { animation: mflameOn calc(10s * var(--k, 1)) linear both; }
+  .firescene.lighting.st3 .mspark { animation: msparkPop calc(10s * var(--k, 1)) linear both; }
+  .mflame, .mspark { transform-box: fill-box; }
+  .mflame { transform-origin: 50% 100%; }
+  .mspark { transform-origin: 50% 50%; }
+  @keyframes mboxIn {
+    0% { opacity: 0; transform: translateX(34px); }
+    9%, 84% { opacity: 1; transform: none; }
+    100% { opacity: 0; transform: translateX(34px); }
+  }
+  /* the match: waits above the box, rests its head on the striker, STRIKES, lifts (now lit),
+     is carried to the logs, holds there while they catch, then fades away */
+  @keyframes matchGo {
+    0%, 9% { opacity: 0; transform: translate(150px, 56px); }
+    17%, 24% { opacity: 1; transform: translate(156px, 76px); }
+    27.5% { opacity: 1; transform: translate(183px, 74px); }
+    36%, 44% { opacity: 1; transform: translate(170px, 58px); }
+    68%, 83% { opacity: 1; transform: translate(105px, 81px); }
+    93%, 100% { opacity: 0; transform: translate(114px, 64px); }
+  }
+  @keyframes mflameOn {
+    0%, 27% { transform: scale(0); }
+    31% { transform: scale(1.5); }
+    37%, 100% { transform: scale(1); }
+  }
+  @keyframes msparkPop {
+    0%, 25.5% { opacity: 0; transform: scale(.2); }
+    27.5% { opacity: 1; transform: scale(1); }
+    34%, 100% { opacity: 0; transform: scale(1.7); }
+  }
+
   /* ===== ANIMATED ICONS ===== */
   @keyframes flicker {
     0%, 100% { transform: scale(1, 1) skewX(0); }
@@ -385,8 +445,8 @@
           <stop offset="1" stop-color="#ff9a3c" stop-opacity="0"/>
         </radialGradient>
       </defs>
-      <ellipse class="fs-glow" cx="100" cy="86" rx="95" ry="40" fill="url(#fsGlow)"/>
-      <g id="flameGroup">
+      <g class="glowwrap"><ellipse class="fs-glow" cx="100" cy="86" rx="95" ry="40" fill="url(#fsGlow)"/></g>
+      <g id="flameWrap"><g id="flameGroup">
         <!-- back flames -->
         <g transform="translate(72 84)"><path class="fx f2" d="M0 0C12 -5 14 -24 2 -44C4 -30 -5 -27 -7 -35C-14 -22 -12 -6 0 0Z" fill="#e8481f"/></g>
         <g transform="translate(128 84)"><path class="fx f3" d="M0 0C12 -6 13 -26 -2 -46C-1 -32 -8 -30 -9 -36C-14 -22 -12 -6 0 0Z" fill="#e8481f"/></g>
@@ -397,18 +457,37 @@
         <!-- bright middles -->
         <g transform="translate(100 86)"><path class="fx f3" d="M0 0C11 -4 13 -20 2 -40C3 -28 -4 -26 -6 -32C-13 -20 -11 -5 0 0Z" fill="#ffb347"/></g>
         <g transform="translate(100 86)"><path class="fx f4" d="M0 0C6 -3 7 -12 1 -24C1 -17 -3 -16 -4 -19C-7 -12 -6 -3 0 0Z" fill="#ffe27a"/></g>
-      </g>
+      </g></g>
       <!-- embers floating up -->
       <circle class="ember e1" cx="92" cy="60" r="1.4" fill="#ffd27a"/>
       <circle class="ember e2" cx="108" cy="58" r="1.1" fill="#ffb347"/>
       <circle class="ember e3" cx="100" cy="55" r="1.2" fill="#ffe27a"/>
       <circle class="ember e4" cx="118" cy="62" r="1" fill="#ffd27a"/>
       <!-- logs -->
-      <g transform="rotate(-9 100 90)"><rect x="58" y="84" width="84" height="11" rx="5.5" fill="#6b3f1f"/>
-        <ellipse cx="139" cy="89.5" rx="4" ry="5.5" fill="#a8703f"/><ellipse cx="139" cy="89.5" rx="2" ry="3" fill="#c48c55"/></g>
-      <g transform="rotate(9 100 90)"><rect x="58" y="84" width="84" height="11" rx="5.5" fill="#7a4924"/>
-        <ellipse cx="61" cy="89.5" rx="4" ry="5.5" fill="#a8703f"/><ellipse cx="61" cy="89.5" rx="2" ry="3" fill="#c48c55"/></g>
-      <ellipse cx="100" cy="94" rx="30" ry="3" fill="#ff7a2f" opacity=".55"/>
+      <g class="log l1"><g transform="rotate(-9 100 90)"><rect x="58" y="84" width="84" height="11" rx="5.5" fill="#6b3f1f"/>
+        <ellipse cx="139" cy="89.5" rx="4" ry="5.5" fill="#a8703f"/><ellipse cx="139" cy="89.5" rx="2" ry="3" fill="#c48c55"/></g></g>
+      <g class="log l2"><g transform="rotate(9 100 90)"><rect x="58" y="84" width="84" height="11" rx="5.5" fill="#7a4924"/>
+        <ellipse cx="61" cy="89.5" rx="4" ry="5.5" fill="#a8703f"/><ellipse cx="61" cy="89.5" rx="2" ry="3" fill="#c48c55"/></g></g>
+      <ellipse class="hearth" cx="100" cy="94" rx="30" ry="3" fill="#ff7a2f"/>
+      <!-- matchbox + match: only seen while the fire is lighting -->
+      <g class="matchkit">
+        <g class="mbox">
+          <rect x="152" y="76" width="36" height="19" rx="3.5" fill="#b9472b"/>
+          <rect x="152" y="76" width="36" height="5.5" rx="2.75" fill="#3b2a20"/>
+          <rect x="159" y="84.5" width="22" height="7.5" rx="2" fill="#f3dfb0"/>
+          <g transform="translate(170 91) scale(.24)"><path d="M0 0C6 -3 7 -12 1 -24C1 -17 -3 -16 -4 -19C-7 -12 -6 -3 0 0Z" fill="#e8481f"/></g>
+        </g>
+        <g transform="translate(183 74)"><g class="mspark" stroke="#ffe27a" stroke-width="1.6" stroke-linecap="round">
+          <path d="M0 -4V-8M3.5 -2L7 -5M-3.5 -2L-7 -5M4.5 2H8.5M-4.5 2H-8.5" fill="none"/></g></g>
+        <g class="match">
+          <path d="M0 0L13 -13" stroke="#e9cf9a" stroke-width="2.4" stroke-linecap="round" fill="none"/>
+          <circle r="2.7" fill="#c8372a"/>
+          <g class="mflame"><g transform="scale(.62)">
+            <path class="fx f1" d="M0 0C6 -3 7 -12 1 -24C1 -17 -3 -16 -4 -19C-7 -12 -6 -3 0 0Z" fill="#ff8a2a"/>
+            <g transform="scale(.55)"><path class="fx f4" d="M0 0C6 -3 7 -12 1 -24C1 -17 -3 -16 -4 -19C-7 -12 -6 -3 0 0Z" fill="#ffe27a"/></g>
+          </g></g>
+        </g>
+      </g>
     </svg>
   </div>
   </div>
@@ -545,7 +624,7 @@ var FIRE_ROOM = "Living Room";
 // Rooms to show if the LIFX list can't load
 var FALLBACK_ROOMS = ["Living Room", "Master bedroom", "Kids", "Office", "Garage"];
 // Bumped every time the page is changed, so you can tell when the phone has the new one.
-var APP_VERSION = "3.1";
+var APP_VERSION = "3.2";
 // ====================================================
 
 var LIFX = "https://api.lifx.com/v1";
@@ -634,6 +713,7 @@ function fire(id) {
   return fetch(ESP + "/button/" + id + "/press", { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body: "1" })
     .then(function () {
       say("Fireplace: " + id.replace("_", " "));
+      if (id === "fire_on" || id === "fire_off") setTimeout(syncFromBox, 800);
       return true;
     })
     .catch(function () { say("Can't reach the fireplace box", true); return false; });
@@ -672,9 +752,18 @@ $("ask").addEventListener("click", function (e) { if (e.target === this) closeAs
 each("[data-fire]", function (b) {
   b.addEventListener("click", function () {
     var id = b.getAttribute("data-fire");
+    if (id === "fire_on" && boxWait("on") > 0) {
+      say("Fire on is resting. Ready in " + mmss(boxWait("on")), true); return;
+    }
+    if (id === "flame_up" || id === "flame_down") {
+      if (boxWait("flame") > 0) { say("Still lighting. Flame buttons work in " + mmss(boxWait("flame")), true); return; }
+      if (Date.now() - lastFlameTap < FLAME_GAP) return;   // too fast: the box would skip it too
+      lastFlameTap = Date.now();
+    }
     function go() {
       markScene(null);
       if (id === "fire_on" || id === "fire_off") markFire(id);
+      if (id === "fire_on") startLighting(Date.now());
       else {
         flash(b);
         setFlameLevel(flameLevel + (id === "flame_up" ? 1 : -1));
@@ -748,6 +837,41 @@ function markFire(id) {
   });
   // the little fire scene in the Fireplace box shows while the fire is on
   $("fireScene").classList.toggle("show", id === "fire_on");
+  if (id !== "fire_on") stopLighting();
+}
+// ---------- lighting animation ----------
+// While the fireplace lights (about a minute), the little scene builds the fire:
+// a log drops in, then the other, a match is struck on its box and carried over,
+// a tiny flame catches and slowly grows to the full fire. See the "lighting" CSS.
+var LIGHT_SECS = 60;                        // how long lighting takes (the box tells us; 60 if it doesn't)
+var LIGHT_AT = [1.5, 5, 9, 17, 30, 45];     // second (out of 60) each step st1..st6 starts
+var lightStart = 0, lightTick = null;
+function startLighting(startMs) {
+  if (lightStart && Math.abs(lightStart - startMs) < 3000) return;   // already playing this one
+  stopLighting();
+  if ((Date.now() - startMs) / 1000 >= LIGHT_SECS) return;
+  lightStart = startMs;
+  var sc = $("fireScene");
+  sc.style.setProperty("--k", LIGHT_SECS / 60);
+  sc.classList.add("lighting");
+  void sc.offsetWidth;                      // start from the empty hearth, even when joining part-way
+  stepLighting();
+  lightTick = setInterval(stepLighting, 250);
+}
+function stepLighting() {
+  var sc = $("fireScene"), k = LIGHT_SECS / 60, t = (Date.now() - lightStart) / 1000;
+  if (t >= LIGHT_SECS) { stopLighting(); return; }
+  for (var i = 0; i < LIGHT_AT.length; i++) {
+    var cls = "st" + (i + 1);
+    if (t >= LIGHT_AT[i] * k && !sc.classList.contains(cls)) {
+      if (i === 2 && t > LIGHT_AT[2] * k + 2) sc.classList.add("nomatch");   // joined late: skip the match
+      sc.classList.add(cls);
+    }
+  }
+}
+function stopLighting() {
+  clearInterval(lightTick); lightTick = null; lightStart = 0;
+  $("fireScene").classList.remove("lighting", "nomatch", "st1", "st2", "st3", "st4", "st5", "st6");
 }
 // ---------- staying in step with the box ----------
 // The box counts down a 4-hour safety timer whenever it turned the fire on
@@ -762,18 +886,65 @@ function showSafety(mins) {
     el.classList.remove("hidden");
   } else el.classList.add("hidden");
 }
+// ---------- cooldowns ----------
+// The box makes some buttons rest: Fire on after a Fire on or Fire off, and the
+// flame arrows while the fire is lighting. The box is the one that enforces it;
+// this page only shows it (dim button + countdown) so nobody wonders why.
+var FLAME_GAP = 1000, lastFlameTap = 0;
+var onWait = 0, flameWait = 0, waitHeard = 0;   // seconds left when we last asked, and when that was
+function boxWait(kind) {
+  var w = kind === "on" ? onWait : flameWait;
+  return Math.max(0, Math.ceil(w - (Date.now() - waitHeard) / 1000));
+}
+function mmss(sec) { return Math.floor(sec / 60) + ":" + (sec % 60 < 10 ? "0" : "") + sec % 60; }
+function showWaits() {
+  var on = boxWait("on"), fl = boxWait("flame");
+  var b = document.querySelector('[data-fire="fire_on"]');
+  b.classList.toggle("wait", on > 0);
+  b.textContent = on > 0 ? "Ready in " + mmss(on) : "Fire on";
+  each('[data-fire="flame_up"], [data-fire="flame_down"]', function (x) { x.classList.toggle("wait", fl > 0); });
+}
+setInterval(showWaits, 1000);
+
+// Asks the box how things stand. Newer box software answers with one line like
+// "safety=222;on_wait=45;flame_wait=0"; older software only has the safety number.
+function readBox() {
+  return fetch("/text_sensor/fire_status", { cache: "no-store" })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .catch(function () { return null; })
+    .then(function (j) {
+      var v = j && typeof j.value === "string" ? j.value : "";
+      if (v.indexOf("safety=") === 0) {
+        var o = {};
+        v.split(";").forEach(function (kv) { var p = kv.split("="); o[p[0]] = parseFloat(p[1]); });
+        return { mins: o.safety, on: o.on_wait || 0, flame: o.flame_wait || 0, light: o.light || 60, live: true };
+      }
+      return fetch("/number/safety_minutes_left", { cache: "no-store" })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (n) {
+          if (!n) return null;
+          var mins = parseFloat(n.value);
+          if (isNaN(mins)) mins = parseFloat(n.state);
+          return { mins: mins, on: 0, flame: 0 };
+        });
+    });
+}
 function syncFromBox() {
   if (!ON_BOX || document.hidden) return;
-  fetch("/number/safety_minutes_left", { cache: "no-store" })
-    .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (j) {
-      if (!j) return;
-      var mins = parseFloat(j.value);
-      if (isNaN(mins)) mins = parseFloat(j.state);
-      if (isNaN(mins)) return;
+  readBox()
+    .then(function (st) {
+      if (!st || isNaN(st.mins)) return;
+      onWait = st.on; flameWait = st.flame; waitHeard = Date.now();
+      showWaits();
       // right after a press on this phone, trust the press until the box catches up
-      if (Date.now() - lastFirePress > 3000) markFire(mins >= 1 ? "fire_on" : "fire_off");
-      showSafety(mins);
+      if (Date.now() - lastFirePress > 3000) markFire(st.mins >= 1 ? "fire_on" : "fire_off");
+      showSafety(st.mins);
+      // the lighting animation follows the box, so every phone plays the same moment of it
+      if (st.live) {
+        LIGHT_SECS = st.light;
+        if (st.flame > 0 && st.mins >= 1) startLighting(Date.now() - (LIGHT_SECS - st.flame) * 1000);
+        else if (lightStart && Date.now() - lastFirePress > 3000) stopLighting();
+      }
     })
     .catch(function () {});
 }
@@ -1092,14 +1263,15 @@ placeKelvin(2700);
 
 // ---------- scenes ----------
 $("cozy").addEventListener("click", function () {
-  function go() {
-    fire("fire_on"); markFire("fire_on");
+  function go(lightsOnly) {
+    if (!lightsOnly) { fire("fire_on"); markFire("fire_on"); startLighting(Date.now()); }
     markScene("cozy"); markPreset(null); markPower("lon"); markMode("white");
     setState({ power: "on", color: "kelvin:2200", brightness: 0.35, duration: 2 }, "group:" + FIRE_ROOM)
-      .then(sayIf("Cozy time"));
+      .then(sayIf(lightsOnly ? "Cozy lights. Fire on is resting for " + mmss(boxWait("on")) : "Cozy time"));
   }
-  if (espReady) askFire("Get cozy?", "Cozy lights the fire and turns the lights warm.", function (yes) { if (yes) go(); });
-  else go();
+  if (boxWait("on") > 0) go(true);
+  else if (espReady) askFire("Get cozy?", "Cozy lights the fire and turns the lights warm.", function (yes) { if (yes) go(false); });
+  else go(false);
 });
 $("alloff").addEventListener("click", function () {
   fire("fire_off"); markFire("fire_off");
