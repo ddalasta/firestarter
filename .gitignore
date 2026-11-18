@@ -7,3 +7,8 @@ secrets.yaml
 .esphome/
 private/
 dog-preview.html
+
+# Phone app: build output and signing key stay on this computer
+app/build/
+*.keystore
+*.keystore.pass
