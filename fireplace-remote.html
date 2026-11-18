@@ -402,6 +402,7 @@
     <button data-fire="flame_up"><svg class="ico flame"><use href="#i-flame"/></svg> Flame up</button>
     <button data-fire="flame_down"><svg class="ico flame down"><use href="#i-flame"/></svg> Flame down</button>
   </div>
+  <p class="note hidden" id="safetyNote" style="margin:12px 0 0"></p>
 </section>
 
 <section class="compact">
@@ -516,7 +517,7 @@ var FIRE_ROOM = "Living Room";
 // Rooms to show if the LIFX list can't load
 var FALLBACK_ROOMS = ["Living Room", "Master bedroom", "Kids", "Office", "Garage"];
 // Bumped every time the page is changed, so you can tell when the phone has the new one.
-var APP_VERSION = "2.8";
+var APP_VERSION = "2.9";
 // ====================================================
 
 var LIFX = "https://api.lifx.com/v1";
@@ -596,8 +597,10 @@ function say(msg, isErr) {
 
 // ---------- fireplace ----------
 // resolves true if the press was sent, false if not
+var lastFirePress = 0;   // when this phone last pressed Fire on / Fire off
 function fire(id) {
   if (!espReady) { say("Fireplace isn't set up yet", true); return Promise.resolve(false); }
+  if (id === "fire_on" || id === "fire_off") lastFirePress = Date.now();
   // no-cors: the ESP32 does the press; we can't read its reply, so assume it worked
   // the box insists on a Content-Length, so send a tiny body
   return fetch(ESP + "/button/" + id + "/press", { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body: "1" })
@@ -683,6 +686,38 @@ function markFire(id) {
   // the little fire scene in the Fireplace box shows while the fire is on
   $("fireScene").classList.toggle("show", id === "fire_on");
 }
+// ---------- staying in step with the box ----------
+// The box counts down a 4-hour safety timer whenever it turned the fire on
+// (0 = it hasn't). Every phone asks the box for that number every few seconds,
+// so if Mom turns the fire on from her phone, yours shows "Fire on" too.
+// It only knows about fires turned on from this remote, not the real handset.
+function showSafety(mins) {
+  var el = $("safetyNote");
+  if (mins >= 1) {
+    var h = Math.floor(mins / 60), m = Math.round(mins % 60);
+    el.textContent = "Safety: turns itself off in " + (h ? h + " h " : "") + m + " min";
+    el.classList.remove("hidden");
+  } else el.classList.add("hidden");
+}
+function syncFromBox() {
+  if (!ON_BOX || document.hidden) return;
+  fetch("/number/safety_minutes_left", { cache: "no-store" })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (j) {
+      if (!j) return;
+      var mins = parseFloat(j.value);
+      if (isNaN(mins)) mins = parseFloat(j.state);
+      if (isNaN(mins)) return;
+      // right after a press on this phone, trust the press until the box catches up
+      if (Date.now() - lastFirePress > 3000) markFire(mins >= 1 ? "fire_on" : "fire_off");
+      showSafety(mins);
+    })
+    .catch(function () {});
+}
+setInterval(syncFromBox, 4000);
+document.addEventListener("visibilitychange", syncFromBox);
+syncFromBox();
+
 // Flame up / down make the pretend fire bigger or smaller (it's a guess:
 // the real fireplace doesn't tell us its flame height)
 var flameLevel = 3;

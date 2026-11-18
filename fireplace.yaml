@@ -73,14 +73,60 @@ remote_receiver:
   idle: 6ms
   buffer_size: 4kb
 
+# ---------- Backup safety timer ----------
+# Whenever the box turns the fire on, it starts counting down 4 hours. When the
+# count reaches 0 the box turns the fire off by itself, even if the phone, the
+# WiFi and the internet are all down. "Fire off" clears the count.
+# The count is saved, so a power blip doesn't forget it. It can never be set
+# higher than 240 minutes. 0 means "the box has not turned the fire on".
+# Limit: the box only knows about fires IT turned on, not the real handset.
+number:
+  - platform: template
+    name: "safety_minutes_left"
+    id: safety_minutes_left
+    icon: "mdi:timer-outline"
+    unit_of_measurement: min
+    min_value: 0
+    max_value: 240
+    step: 1
+    optimistic: true
+    restore_value: true
+    initial_value: 0
+
+interval:
+  - interval: 1min
+    then:
+      - lambda: |-
+          float left = id(safety_minutes_left).state;
+          if (left >= 1) {
+            auto call = id(safety_minutes_left).make_call();
+            call.set_value(left - 1);
+            call.perform();
+            if (left - 1 < 1) id(safety_shutoff).execute();
+          }
+
+script:
+  - id: safety_shutoff
+    mode: single
+    then:
+      - logger.log:
+          level: WARN
+          format: "Safety timer: fire has been on 4 hours, turning it off"
+      - button.press: fire_off
+      # send it a second time in case the first one was missed
+      - delay: 20s
+      - button.press: fire_off
+
 # The four buttons. Each name matches its id so the phone page's
 # /button/<name>/press address works either way.
-# Each [500, -500] is a placeholder: REPLACE with the captured code.
 button:
   - platform: template
     name: "fire_off"
     id: fire_off
     on_press:
+      - number.set:
+          id: safety_minutes_left
+          value: 0
       - remote_transmitter.transmit_raw:
           transmitter_id: rf_tx
           # Captured 2026-11-17. Short=320/-630, long=630/-310, ~21 ms frame,
@@ -97,6 +143,9 @@ button:
     name: "fire_on"
     id: fire_on
     on_press:
+      - number.set:
+          id: safety_minutes_left
+          value: 240          # start the 4-hour safety countdown
       - remote_transmitter.transmit_raw:
           transmitter_id: rf_tx
           # Captured 2026-11-17 while holding OFF + up arrow (sent continuously
