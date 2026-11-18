@@ -328,7 +328,7 @@
   </defs>
 </svg>
 
-<h1><svg class="ico big"><use href="#i-flame-face"/></svg>Fireplace &amp; Lights</h1>
+<h1 id="title"><svg class="ico big"><use id="titleIco" href="#i-flame-face"/></svg><span id="titleText">Fireplace</span></h1>
 
 <div class="tab" id="tabFire">
 <section>
@@ -490,7 +490,7 @@ var FIRE_ROOM = "Living Room";
 // Rooms to show if the LIFX list can't load
 var FALLBACK_ROOMS = ["Living Room", "Master bedroom", "Kids", "Office", "Garage"];
 // Bumped every time the page is changed, so you can tell when the phone has the new one.
-var APP_VERSION = "2.6";
+var APP_VERSION = "2.7";
 // ====================================================
 
 var LIFX = "https://api.lifx.com/v1";
@@ -1073,6 +1073,9 @@ var TAB_IDLE_MS = 3 * 60 * 1000, lastTouch = Date.now();
 function showTab(id) {
   each(".tab", function (t) { t.classList.toggle("hidden", t.id !== id); });
   each(".tabbtn", function (b) { b.classList.toggle("sel", b.getAttribute("data-tab") === id); });
+  var lights = id === "tabLights";
+  $("titleText").textContent = lights ? "Lights" : "Fireplace";
+  $("titleIco").setAttribute("href", lights ? "#i-bulb" : "#i-flame-face");
   window.scrollTo(0, 0);
 }
 each(".tabbtn", function (b) {
