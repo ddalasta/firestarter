@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#000000">
 <!-- tells phones "this page is already dark", so they don't auto-darken it and wreck the colors -->
 <meta name="color-scheme" content="only dark">
@@ -32,7 +32,9 @@
   .ico.big { width: 1.15em; height: 1.15em; vertical-align: -0.3em; margin-right: 4px; }
   .ico.flame { width: 1.35em; height: 1.35em; vertical-align: -0.35em; }
   .ico.down { transform: rotate(180deg); }
-  body { padding: 16px; max-width: 720px; margin: 0 auto; user-select: none; }
+  /* top padding keeps everything clear of the camera hole; bottom leaves room for the tab bar */
+  body { padding: max(env(safe-area-inset-top, 0px), 34px) 16px calc(112px + env(safe-area-inset-bottom, 0px));
+    max-width: 720px; margin: 0 auto; user-select: none; }
   h1 { font-size: 26px; font-weight: 700; margin: 4px 0 14px; letter-spacing: .2px; }
   h2 { font-size: 16px; text-transform: uppercase; letter-spacing: 1.2px;
     color: var(--muted); margin: 0 0 12px; font-weight: 600; }
@@ -134,6 +136,26 @@
   #kelvin { background: linear-gradient(90deg, #ff8a2a, #ffd6a0, #fff4e8, #cfe2ff); }
   #kelvin.dim { opacity: .45; }
 
+  /* ===== TABS ===== */
+  .tab { animation: tabin .25s ease-out; }
+  @keyframes tabin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .tabbar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    z-index: 40; display: flex; gap: 8px; padding: 7px; border-radius: 999px;
+    background: #1d1d21; border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(0,0,0,.6); }
+  .tabbar .tabbtn { display: flex; align-items: center; gap: 8px; padding: 10px 20px 10px 14px; border-radius: 999px;
+    font-size: 17px; background: transparent; border-color: transparent; box-shadow: none; color: var(--muted); }
+  .tabbar .tabbtn::after { display: none; }
+  .tabbar .tabbtn:active { transform: scale(.94); }
+  .tabbar .tabbtn.sel { background: var(--panel-2); color: var(--text); border-color: var(--glow);
+    box-shadow: 0 0 4px 0 var(--glow), 0 0 12px 2px var(--glow-soft); }
+  .tabico { width: 30px; height: 30px; transition: transform .25s; filter: grayscale(.7) brightness(.8); }
+  .tabbtn.sel .tabico { filter: none; animation: tabhop .45s ease-out; }
+  @keyframes tabhop { 0% { transform: scale(.8); } 50% { transform: scale(1.18) translateY(-3px); } 100% { transform: scale(1); } }
+  .bulb-glow { transform-box: view-box; transform-origin: 16px 13px; opacity: 0; transition: opacity .3s; }
+  .tabbtn.sel .bulb-glow { opacity: 1; animation: bulbglow 2.4s ease-in-out infinite; }
+  @keyframes bulbglow { 0%, 100% { transform: scale(.9); } 50% { transform: scale(1.1); } }
+  @media (prefers-reduced-motion: reduce) { .tab, .tabbtn.sel .tabico, .tabbtn.sel .bulb-glow { animation: none; } }
+
   /* "pick a room first": light controls fade until a room is chosen */
   .roomhint { display: none; text-align: center; margin: -4px 0 12px; }
   .noroom .roomhint { display: block; }
@@ -147,7 +169,7 @@
   #celebrate { position: fixed; inset: 0; pointer-events: none; z-index: 50; overflow: hidden; display: none; }
   #celebrate.on { display: block; }
   #celebrate .gs { position: absolute; left: 0; right: 0; top: 38%; text-align: center; font-weight: 700;
-    font-size: clamp(44px, 14vw, 84px); letter-spacing: 1px; line-height: 1;
+    font-size: clamp(34px, 11vw, 80px); letter-spacing: 1px; line-height: 1.05; padding: 0 12px;
     background: linear-gradient(90deg, #7dc242, #5d9732 40%, #2f7fc1 60%, #236192);
     -webkit-background-clip: text; background-clip: text; color: transparent;
     -webkit-text-stroke: 1.5px rgba(255,255,255,.85);
@@ -161,7 +183,7 @@
   @keyframes cffall { to { transform: translate(var(--x, 0), 110vh) rotate(var(--r, 540deg)); opacity: .9; } }
   @media (prefers-reduced-motion: reduce) { #celebrate .cf { display: none; } #celebrate .gs { animation: none; } }
 
-  #status { position: fixed; left: 16px; right: 16px; bottom: 16px; max-width: 688px; margin: 0 auto;
+  #status { position: fixed; left: 16px; right: 16px; bottom: calc(100px + env(safe-area-inset-bottom, 0px)); max-width: 688px; margin: 0 auto;
     background: #2a2a2fee; color: #fff; border: 2px solid transparent; border-radius: 14px; padding: 12px 14px;
     font-size: 16px; opacity: 0; transform: translateY(10px); transition: .25s; pointer-events: none; }
   #status.show { opacity: 1; transform: none; }
@@ -275,6 +297,18 @@
       <circle cx="20.4" cy="21.6" r="1.1" fill="#ff8fa3" opacity=".8"/>
       </g>
     </symbol>
+    <symbol id="i-bulb" viewBox="0 0 32 32">
+      <g class="bulb-glow"><circle cx="16" cy="13" r="12" fill="#ffd34d" opacity=".25"/></g>
+      <path d="M16 3.5a9 9 0 0 0-5.2 16.3c.9.7 1.4 1.6 1.4 2.6v1.1h7.6v-1.1c0-1 .5-1.9 1.4-2.6A9 9 0 0 0 16 3.5Z"
+        fill="#ffe08a" stroke="#c4860f" stroke-width="1.6" stroke-linejoin="round"/>
+      <rect x="12.2" y="24.4" width="7.6" height="2.4" rx="1" fill="#b4b2a9"/>
+      <rect x="13" y="27.4" width="6" height="2.2" rx="1.1" fill="#888780"/>
+      <circle cx="13.6" cy="12.8" r="1.1" fill="#6b4a06"/>
+      <circle cx="18.4" cy="12.8" r="1.1" fill="#6b4a06"/>
+      <path d="M14.4 15.8Q16 17.2 17.6 15.8" fill="none" stroke="#6b4a06" stroke-width="1.1" stroke-linecap="round"/>
+      <circle cx="11.6" cy="15" r="1" fill="#ff8fa3" opacity=".8"/>
+      <circle cx="20.4" cy="15" r="1" fill="#ff8fa3" opacity=".8"/>
+    </symbol>
     <symbol id="i-sun" viewBox="0 0 32 32">
       <g class="sun-body">
       <g stroke="#e0a21a" stroke-width="2.6" stroke-linecap="round">
@@ -291,6 +325,7 @@
 
 <h1><svg class="ico big"><use href="#i-flame-face"/></svg>Fireplace &amp; Lights</h1>
 
+<div class="tab" id="tabFire">
 <section>
   <h2>Scenes</h2>
   <div class="grid g2">
@@ -347,6 +382,28 @@
   </div>
 </section>
 
+<section class="compact">
+  <h2><svg class="ico big"><use href="#i-moon"/></svg>Sleep timer</h2>
+  <p class="note">Turns off the fire and the <span id="sleepRoom"></span> lights when time's up.</p>
+  <div class="grid g3" id="sleepBtns">
+    <button data-mins="30">30 min</button>
+    <button data-mins="60">1 hour</button>
+    <button data-mins="120">2 hours</button>
+  </div>
+  <div class="customrow" id="sleepCustom">
+    <span>Custom</span>
+    <input type="number" id="customHr" min="0" max="12" inputmode="numeric"><small>hr</small>
+    <input type="number" id="customMin" min="0" max="720" inputmode="numeric"><small>min</small>
+    <button id="customGo">Start</button>
+  </div>
+  <div class="sleeprow hidden" id="sleepRun">
+    <span>Off in <b id="sleepLeft">0:00</b></span>
+    <button class="off" id="sleepCancel">Cancel</button>
+  </div>
+</section>
+</div>
+
+<div class="tab hidden" id="tabLights">
 <section>
   <h2>Lights</h2>
   <div class="hidden" id="tokenSetup">
@@ -385,30 +442,25 @@
     <input type="range" id="kelvin" min="1500" max="9000" step="100" value="2700">
   </div>
 </section>
+</div>
 
-<section class="compact">
-  <h2><svg class="ico big"><use href="#i-moon"/></svg>Sleep timer</h2>
-  <p class="note">Turns off the fire and the <span id="sleepRoom"></span> lights when time's up.</p>
-  <div class="grid g3" id="sleepBtns">
-    <button data-mins="30">30 min</button>
-    <button data-mins="60">1 hour</button>
-    <button data-mins="120">2 hours</button>
-  </div>
-  <div class="customrow" id="sleepCustom">
-    <span>Custom</span>
-    <input type="number" id="customHr" min="0" max="12" inputmode="numeric"><small>hr</small>
-    <input type="number" id="customMin" min="0" max="720" inputmode="numeric"><small>min</small>
-    <button id="customGo">Start</button>
-  </div>
-  <div class="sleeprow hidden" id="sleepRun">
-    <span>Off in <b id="sleepLeft">0:00</b></span>
-    <button class="off" id="sleepCancel">Cancel</button>
-  </div>
-</section>
+
+
+
+
 
 
 <p class="foot"><button class="link" id="tokenChange">LIFX token&hellip;</button>
   <span class="ver" id="ver"></span></p>
+
+<nav class="tabbar" id="tabbar">
+  <button class="tabbtn sel" data-tab="tabFire" aria-label="Fireplace">
+    <svg class="tabico"><use href="#i-flame-face"/></svg><span>Fireplace</span>
+  </button>
+  <button class="tabbtn" data-tab="tabLights" aria-label="Lights">
+    <svg class="tabico bulb"><use href="#i-bulb"/></svg><span>Lights</span>
+  </button>
+</nav>
 
 <div id="status"></div>
 <div id="celebrate" aria-hidden="true"></div>
@@ -433,12 +485,58 @@ var FIRE_ROOM = "Living Room";
 // Rooms to show if the LIFX list can't load
 var FALLBACK_ROOMS = ["Living Room", "Master bedroom", "Kids", "Office", "Garage"];
 // Bumped every time the page is changed, so you can tell when the phone has the new one.
-var APP_VERSION = "2.4";
+var APP_VERSION = "2.5";
 // ====================================================
 
 var LIFX = "https://api.lifx.com/v1";
 var espReady = true;
 var lifxReady = LIFX_TOKEN.length > 20;
+
+// ---------- seasonal theme ("Sounders" most of the year) ----------
+// from/to are [month, day]. The first matching one wins; Sounders is the fallback.
+// Colors: LIFX color strings for the bulbs, plus css colors for the button + confetti.
+var THEMES = [
+  { key: "newyear", name: "New Year", from: [12, 27], to: [1, 2], title: "HAPPY NEW YEAR!", sub: "GOLD \u00b7 SILVER \u00b7 SPARKLE",
+    lights: ["hue:45 saturation:0.85", "kelvin:6500", "hue:275 saturation:0.6"], css: ["#f2c14e", "#f4f4f6", "#9b6bd6"] },
+  { key: "valentine", name: "Valentine", from: [2, 7], to: [2, 14], title: "HAPPY VALENTINE'S!", sub: "PINK \u00b7 RED \u00b7 LOVE",
+    lights: ["hue:335 saturation:0.65", "hue:355 saturation:1"], css: ["#ff6fa8", "#e8243c"] },
+  { key: "stpat", name: "Shamrock", from: [3, 10], to: [3, 17], title: "HAPPY ST. PATRICK'S!", sub: "GO GREEN",
+    lights: ["hue:120 saturation:1", "hue:95 saturation:0.7", "kelvin:4000"], css: ["#1f9e3a", "#8ccf4d", "#fff3d6"] },
+  { key: "july4", name: "July 4th", from: [6, 28], to: [7, 5], title: "HAPPY 4TH!", sub: "RED \u00b7 WHITE \u00b7 BLUE",
+    lights: ["hue:0 saturation:1", "kelvin:6500", "hue:230 saturation:1"], css: ["#e0282e", "#f4f4f6", "#2b50d6"] },
+  { key: "halloween", name: "Spooky", from: [10, 1], to: [10, 31], title: "HAPPY HALLOWEEN!", sub: "TRICK OR TREAT",
+    lights: ["hue:25 saturation:1", "hue:275 saturation:1"], css: ["#ff7a1a", "#8a3fd1"] },
+  { key: "thanks", name: "Harvest", from: [11, 20], to: [11, 30], title: "HAPPY THANKSGIVING!", sub: "WARM \u00b7 COZY \u00b7 THANKFUL",
+    lights: ["hue:28 saturation:0.95", "hue:45 saturation:0.9", "hue:8 saturation:0.9"], css: ["#e8731c", "#e9b234", "#b8401f"] },
+  { key: "xmas", name: "Holiday", from: [12, 1], to: [12, 26], title: "MERRY CHRISTMAS!", sub: "RED \u00b7 GREEN \u00b7 MERRY",
+    lights: ["hue:0 saturation:1", "hue:120 saturation:1", "kelvin:2700"], css: ["#d8262f", "#1f9e3a", "#ffd9a0"] }
+];
+var SOUNDERS_THEME = { key: "sounders", name: "Sounders", title: "GO SOUNDERS!", sub: "RAVE GREEN \u00b7 SOUNDER BLUE",
+  lights: ["hue:96 saturation:0.85", "hue:207 saturation:1"], css: ["#5d9732", "#236192"] };
+function themeFor(d) {
+  var forced = /[?&]theme=([a-z0-9]+)/.exec(location.search);   // e.g. ?theme=xmas to preview one
+  if (forced) {
+    var f = THEMES.filter(function (t) { return t.key === forced[1]; })[0];
+    if (f) return f;
+    if (forced[1] === "sounders") return SOUNDERS_THEME;
+  }
+  var md = (d.getMonth() + 1) * 100 + d.getDate();
+  for (var i = 0; i < THEMES.length; i++) {
+    var t = THEMES[i], a = t.from[0] * 100 + t.from[1], b = t.to[0] * 100 + t.to[1];
+    if (a <= b ? (md >= a && md <= b) : (md >= a || md <= b)) return t;   // ranges can wrap past New Year
+  }
+  return SOUNDERS_THEME;
+}
+var THEME = themeFor(new Date());
+// button background: solid color blocks that blend a little where they meet
+function themeBg(css) {
+  var n = css.length, stops = [];
+  css.forEach(function (c, i) {
+    var a = Math.round(i * 100 / n), b = Math.round((i + 1) * 100 / n);
+    stops.push(c + " " + (i ? a + 8 : 0) + "%", c + " " + (i < n - 1 ? b - 8 : 100) + "%");
+  });
+  return "linear-gradient(90deg, " + stops.join(", ") + ") border-box";
+}
 
 var PRESETS = [
   { name: "Candle",  color: "kelvin:2000", bg: "#ff9a3c" },
@@ -446,8 +544,7 @@ var PRESETS = [
   { name: "Day",     color: "kelvin:4000", bg: "#fff1dc" },
   { name: "Bright",  color: "kelvin:6500", bg: "#e4efff" },
   { name: "Movie",   color: "hue:0 saturation:1",   bg: "#ff4040" },
-  { name: "Sounders", special: "sounders",
-    bg: "linear-gradient(90deg, #5d9732 0%, #5d9732 30%, #236192 70%, #236192 100%) border-box", fg: "#fff" },
+  { name: THEME.name, special: "theme", bg: themeBg(THEME.css), fg: "#fff" },
   { name: "Blue",    color: "hue:220 saturation:1", bg: "#4d8cff" },
   { name: "Green",   color: "hue:120 saturation:1", bg: "#54e06b" }
 ];
@@ -696,7 +793,7 @@ PRESETS.forEach(function (p) {
   b.addEventListener("click", function () {
     if (needRoom()) return;
     markScene(null); markPreset(p.name); markPower("lon");
-    if (p.special === "sounders") { markMode("color"); sounders().then(function (ok) { if (ok) goSounders(); }); return; }
+    if (p.special === "theme") { markMode("color"); themeLights(THEME).then(function (ok) { if (ok) celebrate(THEME); }); return; }
     var m;
     if ((m = /^kelvin:(\d+)/.exec(p.color))) {
       markMode("white"); $("kelvin").value = m[1]; $("kelvinVal").textContent = m[1] + "K";
@@ -708,9 +805,7 @@ PRESETS.forEach(function (p) {
   $("presets").appendChild(b);
 });
 
-// ---------- Sounders: Rave Green + Sounder Blue ----------
-var RAVE_GREEN = "hue:96 saturation:0.85";
-var SOUNDER_BLUE = "hue:207 saturation:1";
+// ---------- theme lights (Sounders / holidays) ----------
 function bulbsIn(sel) {
   return onlineLights.filter(function (l) {
     if (sel === "all") return true;
@@ -719,10 +814,13 @@ function bulbsIn(sel) {
     return false;
   });
 }
-function goSounders() {
+function celebrate(t) {
   var c = $("celebrate");
-  c.innerHTML = '<div class="gs">GO SOUNDERS!<small>RAVE GREEN \u00b7 SOUNDER BLUE</small></div>';
-  var colors = ["#5d9732", "#7dc242", "#236192", "#2f7fc1", "#ffffff"];
+  c.innerHTML = '<div class="gs">' + t.title + '<small>' + t.sub + '</small></div>';
+  c.firstChild.style.background = "linear-gradient(90deg, " + t.css.join(", ") + ")";
+  c.firstChild.style.webkitBackgroundClip = "text";
+  c.firstChild.style.backgroundClip = "text";
+  var colors = t.css.concat(["#ffffff"]);
   for (var i = 0; i < 46; i++) {
     var d = document.createElement("i");
     d.className = "cf";
@@ -737,26 +835,25 @@ function goSounders() {
   }
   c.classList.add("on");
   if (navigator.vibrate) navigator.vibrate([40, 60, 40]);
-  clearTimeout(goSounders.t);
-  goSounders.t = setTimeout(function () { c.classList.remove("on"); c.innerHTML = ""; }, 3300);
+  clearTimeout(celebrate.t);
+  celebrate.t = setTimeout(function () { c.classList.remove("on"); c.innerHTML = ""; }, 3300);
 }
-function sounders() {
+function themeLights(t) {
   if (!lifxReady) { say("Lights need a LIFX token", true); return Promise.resolve(false); }
   var bulbs = bulbsIn(selector);
   var p;
   if (bulbs.length >= 2) {
-    // more than one bulb: take turns, green, blue, green, blue...
-    var g = [], bl = [];
-    bulbs.forEach(function (l, i) { (i % 2 ? bl : g).push("id:" + l.id); });
-    p = lifx("PUT", "/lights/states", {
-      states: [{ selector: g.join(","), color: RAVE_GREEN }, { selector: bl.join(","), color: SOUNDER_BLUE }],
-      defaults: { power: "on", duration: 0.8 }
-    });
+    // more than one bulb: take turns through the theme's colors
+    var groups = t.lights.map(function () { return []; });
+    bulbs.forEach(function (l, i) { groups[i % groups.length].push("id:" + l.id); });
+    var states = [];
+    groups.forEach(function (g, i) { if (g.length) states.push({ selector: g.join(","), color: t.lights[i] }); });
+    p = lifx("PUT", "/lights/states", { states: states, defaults: { power: "on", duration: 0.8 } });
   } else {
-    // one bulb: slowly fade back and forth between green and blue
+    // one bulb: slowly fade back and forth between the first two colors
     effectOn = true;
     p = lifx("POST", "/lights/" + encodeURIComponent(selector) + "/effects/breathe", {
-      color: SOUNDER_BLUE, from_color: RAVE_GREEN, period: 4, cycles: 100000, persist: true, power_on: true
+      color: t.lights[1], from_color: t.lights[0], period: 4, cycles: 100000, persist: true, power_on: true
     });
   }
   return p.then(function () { return true; }).catch(function (e) { say(e.message, true); return false; });
@@ -960,6 +1057,26 @@ $("tokenChange").addEventListener("click", function () {
   $("tokenSetup").classList.toggle("hidden");
   if (!$("tokenSetup").classList.contains("hidden")) $("tokenSetup").scrollIntoView({ behavior: "smooth", block: "center" });
 });
+
+// ---------- tabs ----------
+// Goes back to the Fireplace tab after 3 minutes without touching anything.
+var TAB_IDLE_MS = 3 * 60 * 1000, lastTouch = Date.now();
+function showTab(id) {
+  each(".tab", function (t) { t.classList.toggle("hidden", t.id !== id); });
+  each(".tabbtn", function (b) { b.classList.toggle("sel", b.getAttribute("data-tab") === id); });
+  window.scrollTo(0, 0);
+}
+each(".tabbtn", function (b) {
+  b.addEventListener("click", function () {
+    if (b.classList.contains("sel")) return;
+    if (navigator.vibrate) navigator.vibrate(10);
+    showTab(b.getAttribute("data-tab"));
+  });
+});
+document.addEventListener("pointerdown", function () { lastTouch = Date.now(); }, true);
+setInterval(function () {
+  if (Date.now() - lastTouch > TAB_IDLE_MS && $("tabFire").classList.contains("hidden")) showTab("tabFire");
+}, 15000);
 
 // ---------- start ----------
 setFlameLevel(3);
