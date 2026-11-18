@@ -387,7 +387,14 @@
 <script>
 // ===================== SETTINGS =====================
 // ESP32 address. Filled in after the box is built, e.g. "http://192.168.1.50"
-var ESP = "http://192.168.7.254";
+var BOX = "http://192.168.7.254";
+// When the box itself serves this page (the normal setup), talk to it on the same
+// address with no host at all: nothing for the browser to block.
+var ON_BOX = location.protocol === "http:" &&
+  (location.host === BOX.replace("http://", "") || location.hostname === "fireplace.local");
+var ESP = ON_BOX ? "" : BOX;
+// Where the newest copy of this page lives (used by the auto-update check)
+var PAGE_URL = "https://ddalasta.github.io/firestarter/fireplace-remote.html";
 // LIFX token: NOT stored in this file (so the page can live on a website).
 // The page asks for it once and saves it only on that device.
 var LIFX_TOKEN = "";
@@ -397,11 +404,11 @@ var FIRE_ROOM = "Living Room";
 // Rooms to show if the LIFX list can't load
 var FALLBACK_ROOMS = ["Living Room", "Master bedroom", "Kids", "Office", "Garage"];
 // Bumped every time the page is changed, so you can tell when the phone has the new one.
-var APP_VERSION = "2.2";
+var APP_VERSION = "2.3";
 // ====================================================
 
 var LIFX = "https://api.lifx.com/v1";
-var espReady = ESP.indexOf("REPLACE") === -1;
+var espReady = true;
 var lifxReady = LIFX_TOKEN.length > 20;
 
 var PRESETS = [
@@ -853,7 +860,8 @@ loadLights();
 (function () {
   var when = "";
   var d = new Date(document.lastModified);
-  if (!isNaN(d)) {
+  if (ON_BOX) { when = " \u00b7 via fireplace box"; }
+  else if (!isNaN(d)) {
     when = " \u00b7 updated " + d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) +
            " " + d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   }
@@ -866,12 +874,15 @@ loadLights();
 // (Doesn't run for a page opened straight from a file.)
 function checkForUpdate() {
   if (location.protocol.indexOf("http") !== 0) return;
-  var url = location.pathname + "?check=" + Date.now();
+  var url = PAGE_URL + "?check=" + Date.now();
   fetch(url, { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (html) {
     var m = /APP_VERSION = "([^"]+)"/.exec(html);
     if (m && m[1] !== APP_VERSION) {
       say("Updating to version " + m[1] + "\u2026");
-      setTimeout(function () { location.replace(location.pathname + "?v=" + encodeURIComponent(m[1])); }, 1500);
+      setTimeout(function () {
+        // on the box, reloading re-fetches the newest page; elsewhere, ask GitHub for a fresh copy
+        if (ON_BOX) location.reload(); else location.replace(location.pathname + "?v=" + encodeURIComponent(m[1]));
+      }, 1500);
     }
   }).catch(function () {});
 }

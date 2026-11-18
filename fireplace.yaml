@@ -36,6 +36,9 @@ ota:
 web_server:
   port: 80
   version: 3
+  # Makes the box's page load the phone remote from GitHub (see remote-loader.js).
+  # Original button page: http://<box>/?native
+  js_include: "remote-loader.js"
 
 spi:
   clk_pin: GPIO18
