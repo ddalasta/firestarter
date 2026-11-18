@@ -189,6 +189,23 @@
   @media (prefers-reduced-motion: reduce) { #celebrate .cf { display: none; } #celebrate .gs { animation: none; } }
 
   /* ---------- screen saver ---------- */
+  /* "Light the fire?" card: our own question, instead of the phone's plain pop-up */
+  #ask { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; justify-content: center;
+    background: rgba(0,0,0,.62); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+    opacity: 0; pointer-events: none; transition: opacity .2s; }
+  #ask.show { opacity: 1; pointer-events: auto; }
+  #ask .card { width: 100%; max-width: 696px; margin: 0 12px calc(16px + env(safe-area-inset-bottom, 0px));
+    background: var(--panel); border: 1px solid var(--line); border-radius: 28px; padding: 20px 16px 16px;
+    text-align: center; box-shadow: 0 0 40px rgba(255,122,47,.18);
+    transform: translateY(120%); transition: transform .3s cubic-bezier(.2,.9,.3,1.12); }
+  #ask.show .card { transform: none; }
+  #ask .askflame { width: 86px; height: 86px; display: block; margin: 0 auto 6px; animation: askbob 1.6s ease-in-out infinite; }
+  #ask.yes .askflame { animation: askhop .42s ease-out; }
+  #ask h3 { font-size: 27px; font-weight: 700; margin: 0 0 6px; }
+  #ask p { color: var(--muted); font-size: 16px; margin: 0 0 18px; line-height: 1.35; }
+  #ask button { padding: 18px 10px; font-size: 20px; }
+  @keyframes askbob { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-6px) rotate(3deg); } }
+  @keyframes askhop { 0% { transform: scale(1); } 45% { transform: translateY(-18px) scale(1.25); } 100% { transform: scale(1); } }
   #saver { position: fixed; inset: 0; z-index: 80; background: #000; display: none; cursor: none; }
   #saver.on { display: block; animation: saverIn 1.5s ease; }
   @keyframes saverIn { from { opacity: 0; } }
@@ -487,6 +504,17 @@
 
 <div id="status"></div>
 <div id="celebrate" aria-hidden="true"></div>
+<div id="ask">
+  <div class="card" role="dialog" aria-labelledby="askTitle">
+    <svg class="askflame" viewBox="0 0 32 32"><use href="#i-flame"/></svg>
+    <h3 id="askTitle">Light the fire?</h3>
+    <p id="askText"></p>
+    <div class="grid g2">
+      <button class="off" id="askNo">Not now</button>
+      <button class="fire" id="askYes">Light it</button>
+    </div>
+  </div>
+</div>
 <div id="saver" aria-hidden="true">
   <canvas id="saverSky"></canvas>
   <div id="saverGlow"></div>
@@ -517,7 +545,7 @@ var FIRE_ROOM = "Living Room";
 // Rooms to show if the LIFX list can't load
 var FALLBACK_ROOMS = ["Living Room", "Master bedroom", "Kids", "Office", "Garage"];
 // Bumped every time the page is changed, so you can tell when the phone has the new one.
-var APP_VERSION = "2.9";
+var APP_VERSION = "3.0";
 // ====================================================
 
 var LIFX = "https://api.lifx.com/v1";
@@ -610,17 +638,52 @@ function fire(id) {
     })
     .catch(function () { say("Can't reach the fireplace box", true); return false; });
 }
+// ---------- "Light the fire?" card ----------
+// Our own question instead of the phone's plain confirm() box. Calls back with
+// true only when "Light it" is tapped. "Not now", a tap outside the card, or
+// 30 seconds with no answer all count as no.
+var askDone = null, askTimer = null, askOpened = 0;
+function askFire(title, text, cb) {
+  closeAsk(false);                       // one question at a time
+  $("askTitle").textContent = title;
+  $("askText").textContent = text;
+  askDone = cb; askOpened = Date.now();
+  $("ask").classList.remove("yes");
+  $("ask").classList.add("show");
+  askTimer = setTimeout(function () { closeAsk(false); }, 30000);
+}
+function closeAsk(yes) {
+  clearTimeout(askTimer); askTimer = null;
+  var cb = askDone; askDone = null;
+  if (!cb) return;
+  if (yes) {
+    $("ask").classList.add("yes");       // the flame hops, then the card slides away
+    setTimeout(function () { $("ask").classList.remove("show"); }, 380);
+  } else $("ask").classList.remove("show");
+  cb(yes);
+}
+$("askYes").addEventListener("click", function () {
+  if (Date.now() - askOpened < 350) return;   // ignore a stray double-tap as the card appears
+  closeAsk(true);
+});
+$("askNo").addEventListener("click", function () { closeAsk(false); });
+$("ask").addEventListener("click", function (e) { if (e.target === this) closeAsk(false); });
+
 each("[data-fire]", function (b) {
   b.addEventListener("click", function () {
     var id = b.getAttribute("data-fire");
-    if (id === "fire_on" && !confirm("Turn the fireplace ON?")) return;
-    markScene(null);
-    if (id === "fire_on" || id === "fire_off") markFire(id);
-    else {
-      flash(b);
-      setFlameLevel(flameLevel + (id === "flame_up" ? 1 : -1));
+    function go() {
+      markScene(null);
+      if (id === "fire_on" || id === "fire_off") markFire(id);
+      else {
+        flash(b);
+        setFlameLevel(flameLevel + (id === "flame_up" ? 1 : -1));
+      }
+      fire(id);
     }
-    fire(id);
+    if (id === "fire_on") {
+      askFire("Light the fire?", "It turns itself off after 4 hours.", function (yes) { if (yes) go(); });
+    } else go();
   });
 });
 
@@ -1025,11 +1088,14 @@ placeKelvin(2700);
 
 // ---------- scenes ----------
 $("cozy").addEventListener("click", function () {
-  if (espReady && !confirm("Cozy turns the fireplace ON. Go?")) return;
-  fire("fire_on"); markFire("fire_on");
-  markScene("cozy"); markPreset(null); markPower("lon"); markMode("white");
-  setState({ power: "on", color: "kelvin:2200", brightness: 0.35, duration: 2 }, "group:" + FIRE_ROOM)
-    .then(sayIf("Cozy time"));
+  function go() {
+    fire("fire_on"); markFire("fire_on");
+    markScene("cozy"); markPreset(null); markPower("lon"); markMode("white");
+    setState({ power: "on", color: "kelvin:2200", brightness: 0.35, duration: 2 }, "group:" + FIRE_ROOM)
+      .then(sayIf("Cozy time"));
+  }
+  if (espReady) askFire("Get cozy?", "Cozy lights the fire and turns the lights warm.", function (yes) { if (yes) go(); });
+  else go();
 });
 $("alloff").addEventListener("click", function () {
   fire("fire_off"); markFire("fire_off");
