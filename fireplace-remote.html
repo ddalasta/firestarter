@@ -397,7 +397,7 @@ var FIRE_ROOM = "Living Room";
 // Rooms to show if the LIFX list can't load
 var FALLBACK_ROOMS = ["Living Room", "Master bedroom", "Kids", "Office", "Garage"];
 // Bumped every time the page is changed, so you can tell when the phone has the new one.
-var APP_VERSION = "1.9";
+var APP_VERSION = "2.0";
 // ====================================================
 
 var LIFX = "https://api.lifx.com/v1";
@@ -840,6 +840,24 @@ $("tokenSave").addEventListener("click", function () {
   }
   $("ver").textContent = "Version " + APP_VERSION + when;
 })();
+
+// ---------- auto-update ----------
+// Every 2 minutes, quietly fetch a fresh copy of this page (skipping all saved copies).
+// If its version number is different, reload so the phone always has the newest one.
+// (Doesn't run for a page opened straight from a file.)
+function checkForUpdate() {
+  if (location.protocol.indexOf("http") !== 0) return;
+  var url = location.pathname + "?check=" + Date.now();
+  fetch(url, { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (html) {
+    var m = /APP_VERSION = "([^"]+)"/.exec(html);
+    if (m && m[1] !== APP_VERSION) {
+      say("Updating to version " + m[1] + "\u2026");
+      setTimeout(function () { location.replace(location.pathname + "?v=" + encodeURIComponent(m[1])); }, 1500);
+    }
+  }).catch(function () {});
+}
+setInterval(checkForUpdate, 2 * 60 * 1000);
+setTimeout(checkForUpdate, 5000);
   }).catch(function (e) {
     LIFX_TOKEN = old;
     say(e.message === "LIFX token is wrong" ? "LIFX says that token is wrong" : e.message, true);
