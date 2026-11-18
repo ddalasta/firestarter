@@ -108,7 +108,7 @@
   .colorbox { display: grid; grid-template-columns: 1fr 64px; gap: 16px; align-items: stretch; }
   .wheelwrap { position: relative; width: 100%; max-width: 300px; justify-self: center; }
   .wheelwrap::after { content: ""; display: block; padding-top: 100%; }
-  #wheel { position: absolute; inset: 0; border-radius: 50%; touch-action: none; cursor: crosshair;
+  #wheel { position: absolute; inset: 0; border-radius: 50%; touch-action: pan-y; cursor: crosshair; -webkit-touch-callout: none;
     background:
       radial-gradient(circle closest-side, #fff 0%, rgba(255,255,255,0) 100%),
       conic-gradient(#f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
@@ -119,7 +119,7 @@
 
   .dimcol { display: flex; flex-direction: column; align-items: center; gap: 6px; }
   .dimcol small { color: var(--muted); font-size: 15px; }
-  #dimmer { position: relative; flex: 1; width: 52px; min-height: 200px; border-radius: 14px; touch-action: none; cursor: ns-resize;
+  #dimmer { position: relative; flex: 1; width: 52px; min-height: 200px; border-radius: 14px; touch-action: pan-y; cursor: ns-resize; -webkit-touch-callout: none;
     background: linear-gradient(180deg, #fff, #222); box-shadow: 0 0 0 2px var(--line); }
   #dimHandle { position: absolute; left: -6px; right: -6px; height: 12px; margin-top: -6px; border-radius: 6px;
     background: #fff; border: 2px solid rgba(0,0,0,.6); box-shadow: 0 2px 6px rgba(0,0,0,.6); pointer-events: none; }
@@ -133,6 +133,33 @@
   input[type=range]::-moz-range-thumb { width: 10px; height: 44px; border-radius: 6px; background: #fff; border: 2px solid rgba(0,0,0,.6); }
   #kelvin { background: linear-gradient(90deg, #ff8a2a, #ffd6a0, #fff4e8, #cfe2ff); }
   #kelvin.dim { opacity: .45; }
+
+  /* "pick a room first": light controls fade until a room is chosen */
+  .roomhint { display: none; text-align: center; margin: -4px 0 12px; }
+  .noroom .roomhint { display: block; }
+  .noroom .powerrow, .noroom .swatches, .noroom .colorbox, .noroom .row { opacity: .3; transition: opacity .3s; }
+  .pickrow select.need { animation: needpulse .9s ease-in-out 2; }
+  @keyframes needpulse { 50% { box-shadow: 0 4px 0 rgba(0,0,0,.75), 0 0 10px 3px var(--glow), 0 0 26px 8px var(--glow-soft); } }
+  /* wheel / dimmer "grabbed" after press-and-hold */
+  #wheel.grab, #dimmer.grab { box-shadow: 0 0 0 3px var(--glow), 0 0 24px 8px var(--glow-soft); }
+
+  /* Go Sounders! celebration */
+  #celebrate { position: fixed; inset: 0; pointer-events: none; z-index: 50; overflow: hidden; display: none; }
+  #celebrate.on { display: block; }
+  #celebrate .gs { position: absolute; left: 0; right: 0; top: 38%; text-align: center; font-weight: 700;
+    font-size: clamp(44px, 14vw, 84px); letter-spacing: 1px; line-height: 1;
+    background: linear-gradient(90deg, #7dc242, #5d9732 40%, #2f7fc1 60%, #236192);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    -webkit-text-stroke: 1.5px rgba(255,255,255,.85);
+    filter: drop-shadow(0 4px 14px rgba(0,0,0,.8)); animation: gspop 2.6s ease-out forwards; }
+  #celebrate .gs small { display: block; font-size: .32em; letter-spacing: 6px; margin-top: 10px; -webkit-text-stroke: 0;
+    color: #fff; background: none; }
+  @keyframes gspop { 0% { transform: scale(.2) rotate(-8deg); opacity: 0; } 18% { transform: scale(1.15) rotate(3deg); opacity: 1; }
+    30% { transform: scale(1) rotate(0); } 80% { opacity: 1; } 100% { transform: scale(1.05); opacity: 0; } }
+  #celebrate .cf { position: absolute; top: -20px; width: 10px; height: 16px; border-radius: 2px; opacity: .95;
+    animation: cffall var(--t, 2.4s) linear var(--d, 0s) forwards; }
+  @keyframes cffall { to { transform: translate(var(--x, 0), 110vh) rotate(var(--r, 540deg)); opacity: .9; } }
+  @media (prefers-reduced-motion: reduce) { #celebrate .cf { display: none; } #celebrate .gs { animation: none; } }
 
   #status { position: fixed; left: 16px; right: 16px; bottom: 16px; max-width: 688px; margin: 0 auto;
     background: #2a2a2fee; color: #fff; border: 2px solid transparent; border-radius: 14px; padding: 12px 14px;
@@ -333,6 +360,7 @@
     <label><span>Room</span><select id="roomSel"></select></label>
     <label><span>Light</span><select id="bulbSel"></select></label>
   </div>
+  <p class="note roomhint" id="roomHint">Pick a room above to change the lights.</p>
 
   <div class="powerrow">
     <button id="lon">On</button>
@@ -383,6 +411,7 @@
   <span class="ver" id="ver"></span></p>
 
 <div id="status"></div>
+<div id="celebrate" aria-hidden="true"></div>
 
 <script>
 // ===================== SETTINGS =====================
@@ -404,7 +433,7 @@ var FIRE_ROOM = "Living Room";
 // Rooms to show if the LIFX list can't load
 var FALLBACK_ROOMS = ["Living Room", "Master bedroom", "Kids", "Office", "Garage"];
 // Bumped every time the page is changed, so you can tell when the phone has the new one.
-var APP_VERSION = "2.3";
+var APP_VERSION = "2.4";
 // ====================================================
 
 var LIFX = "https://api.lifx.com/v1";
@@ -425,7 +454,7 @@ var PRESETS = [
 
 var $ = function (id) { return document.getElementById(id); };
 var each = function (sel, fn) { Array.prototype.forEach.call(document.querySelectorAll(sel), fn); };
-var selector = "group:" + FIRE_ROOM;   // what the light controls act on
+var selector = "";   // what the light controls act on
 
 // ---------- status toast ----------
 var toastTimer;
@@ -480,6 +509,7 @@ function lifx(method, path, body) {
 var allLights = [];      // filled in when the LIFX list loads
 var effectOn = false;    // true while the Sounders "breathe" effect is running
 function setState(state, sel) {
+  if (!sel && !selector) { needRoom(); return Promise.resolve(false); }
   // any normal change stops the Sounders effect first
   if (effectOn && lifxReady) {
     effectOn = false;
@@ -566,7 +596,10 @@ function opt(parent, value, text) {
 function fillBulbs(room) {
   var sel = $("bulbSel");
   sel.innerHTML = "";
-  if (room === "all") {
+  sel.disabled = !room;
+  if (!room) {
+    opt(sel, "", "\u2014");
+  } else if (room === "all") {
     opt(sel, "all", "Every light");
     roomList().forEach(function (name) {
       var g = document.createElement("optgroup");
@@ -583,10 +616,33 @@ function fillBulbs(room) {
   sel.value = sel.options[0].value;
 }
 // set what the light controls act on, and keep the dropdowns showing it
+var lightsSection = $("roomSel").closest("section");
 function pick(sel) {
   selector = sel;
-  if ($("bulbSel").querySelector('option[value="' + sel + '"]')) $("bulbSel").value = sel;
+  if (sel && $("bulbSel").querySelector('option[value="' + sel + '"]')) $("bulbSel").value = sel;
+  lightsSection.classList.toggle("noroom", !sel);
+  if (sel) usedLights();
 }
+
+// ---------- "pick a room first" safety ----------
+// The light controls do nothing until a room is picked, and the picker goes back to
+// "Pick a room" after 3 minutes of no light changes, so a stray tap can't change anything.
+var IDLE_RESET_MS = 3 * 60 * 1000, lastLightUse = 0;
+function usedLights() { lastLightUse = Date.now(); }
+function needRoom() {
+  if (selector) { usedLights(); return false; }
+  say("Pick a room first", true);
+  var r = $("roomSel"); r.classList.remove("need"); void r.offsetWidth; r.classList.add("need");
+  return true;
+}
+function resetRoom() {
+  $("roomSel").value = "";
+  fillBulbs("");
+  pick("");
+}
+setInterval(function () {
+  if (selector && Date.now() - lastLightUse > IDLE_RESET_MS) resetRoom();
+}, 15000);
 $("roomSel").addEventListener("change", function () {
   var room = this.value;
   fillBulbs(room);
@@ -596,12 +652,10 @@ $("bulbSel").addEventListener("change", function () { pick(this.value); });
 function buildRooms(rooms) {
   var r = $("roomSel");
   r.innerHTML = "";
+  opt(r, "", "Pick a room\u2026");
   opt(r, "all", "All lights");
   rooms.forEach(function (name) { opt(r, name, name); });
-  var start = rooms.indexOf(FIRE_ROOM) !== -1 ? FIRE_ROOM : "all";
-  r.value = start;
-  fillBulbs(start);
-  pick($("bulbSel").value);
+  resetRoom();
 }
 function loadLights() {
   if (!lifxReady) {
@@ -624,10 +678,12 @@ function loadLights() {
 
 // ---------- on / off ----------
 $("lon").addEventListener("click", function () {
+  if (needRoom()) return;
   markScene(null); markPower("lon");
   setState({ power: "on", duration: 0.5 }).then(sayIf("Lights on"));
 });
 $("loff").addEventListener("click", function () {
+  if (needRoom()) return;
   markScene(null); markPower("loff");
   setState({ power: "off", duration: 0.5 }).then(sayIf("Lights off"));
 });
@@ -638,8 +694,9 @@ PRESETS.forEach(function (p) {
   b.className = "sw"; b.textContent = p.name; b.style.background = p.bg;
   if (p.fg) { b.style.color = p.fg; b.style.textShadow = "0 1px 2px rgba(0,0,0,.6)"; }
   b.addEventListener("click", function () {
+    if (needRoom()) return;
     markScene(null); markPreset(p.name); markPower("lon");
-    if (p.special === "sounders") { markMode("color"); sounders().then(sayIf("Go Sounders!")); return; }
+    if (p.special === "sounders") { markMode("color"); sounders().then(function (ok) { if (ok) goSounders(); }); return; }
     var m;
     if ((m = /^kelvin:(\d+)/.exec(p.color))) {
       markMode("white"); $("kelvin").value = m[1]; $("kelvinVal").textContent = m[1] + "K";
@@ -661,6 +718,27 @@ function bulbsIn(sel) {
     if (sel.indexOf("id:") === 0) return l.id === sel.slice(3);
     return false;
   });
+}
+function goSounders() {
+  var c = $("celebrate");
+  c.innerHTML = '<div class="gs">GO SOUNDERS!<small>RAVE GREEN \u00b7 SOUNDER BLUE</small></div>';
+  var colors = ["#5d9732", "#7dc242", "#236192", "#2f7fc1", "#ffffff"];
+  for (var i = 0; i < 46; i++) {
+    var d = document.createElement("i");
+    d.className = "cf";
+    d.style.left = Math.round(Math.random() * 100) + "%";
+    d.style.background = colors[i % colors.length];
+    d.style.setProperty("--x", Math.round(Math.random() * 160 - 80) + "px");
+    d.style.setProperty("--r", Math.round(Math.random() * 900 - 450) + "deg");
+    d.style.setProperty("--t", (1.8 + Math.random() * 1.4).toFixed(2) + "s");
+    d.style.setProperty("--d", (Math.random() * .5).toFixed(2) + "s");
+    if (i % 3 === 0) { d.style.width = "8px"; d.style.height = "8px"; d.style.borderRadius = "50%"; }
+    c.appendChild(d);
+  }
+  c.classList.add("on");
+  if (navigator.vibrate) navigator.vibrate([40, 60, 40]);
+  clearTimeout(goSounders.t);
+  goSounders.t = setTimeout(function () { c.classList.remove("on"); c.innerHTML = ""; }, 3300);
 }
 function sounders() {
   if (!lifxReady) { say("Lights need a LIFX token", true); return Promise.resolve(false); }
@@ -685,15 +763,48 @@ function sounders() {
 }
 
 // ---------- drag helper (mouse + touch) ----------
+// Mouse: click and drag right away.
+// Finger: a quick swipe just scrolls the page. Press and HOLD for a moment, and the
+// control "grabs" (it glows and the phone buzzes), then dragging changes the lights.
+var HOLD_MS = 400, MOVE_SLOP = 10;
 function draggable(el, onMove) {
+  function at(p) { var r = el.getBoundingClientRect(); onMove(p.clientX - r.left, p.clientY - r.top, r); }
+  // mouse / pen
   var dragging = false;
-  function at(e) { var r = el.getBoundingClientRect(); onMove(e.clientX - r.left, e.clientY - r.top, r); }
   el.addEventListener("pointerdown", function (e) {
+    if (e.pointerType === "touch") return;
+    if (needRoom()) return;
     dragging = true; el.setPointerCapture(e.pointerId); at(e); e.preventDefault();
   });
-  el.addEventListener("pointermove", function (e) { if (dragging) at(e); });
+  el.addEventListener("pointermove", function (e) { if (dragging && e.pointerType !== "touch") at(e); });
   el.addEventListener("pointerup", function () { dragging = false; });
   el.addEventListener("pointercancel", function () { dragging = false; });
+  // touch
+  var timer = null, grabbed = false, moved = false, sx = 0, sy = 0, lastT = null;
+  function end() { clearTimeout(timer); timer = null; grabbed = false; el.classList.remove("grab"); }
+  el.addEventListener("touchstart", function (e) {
+    if (e.touches.length > 1) { end(); return; }
+    var t = e.touches[0]; sx = t.clientX; sy = t.clientY; lastT = t; moved = false; grabbed = false;
+    clearTimeout(timer);
+    timer = setTimeout(function () {
+      if (moved) return;
+      if (needRoom()) return;
+      grabbed = true; el.classList.add("grab");
+      if (navigator.vibrate) navigator.vibrate(15);
+      at(lastT);
+    }, HOLD_MS);
+  }, { passive: true });
+  el.addEventListener("touchmove", function (e) {
+    var t = e.touches[0]; lastT = t;
+    if (grabbed) { e.preventDefault(); at(t); return; }
+    if (Math.abs(t.clientX - sx) > MOVE_SLOP || Math.abs(t.clientY - sy) > MOVE_SLOP) { moved = true; clearTimeout(timer); }
+  }, { passive: false });
+  el.addEventListener("touchend", function () {
+    if (!grabbed && !moved && timer && selector) say("Press and hold to change");
+    end();
+  });
+  el.addEventListener("touchcancel", end);
+  el.addEventListener("contextmenu", function (e) { e.preventDefault(); });
 }
 
 // ---------- color wheel ----------
@@ -737,9 +848,11 @@ placeDim(60);
 (function () {
   var el = $("kelvin");
   function show() { $("kelvinVal").textContent = el.value + "K"; }
-  function send() { markPreset(null); markMode("white"); queue({ color: "kelvin:" + el.value }); }
-  el.addEventListener("input", function () { show(); send(); });
-  el.addEventListener("change", send);
+  var last = el.value;
+  function send() { markPreset(null); markMode("white"); queue({ color: "kelvin:" + el.value }); last = el.value; }
+  function guard() { if (!selector) { el.value = last; show(); needRoom(); return true; } usedLights(); return false; }
+  el.addEventListener("input", function () { if (guard()) return; show(); send(); });
+  el.addEventListener("change", function () { if (guard()) return; send(); });
   show();
 })();
 
