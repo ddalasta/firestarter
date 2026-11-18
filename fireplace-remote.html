@@ -397,7 +397,7 @@ var FIRE_ROOM = "Living Room";
 // Rooms to show if the LIFX list can't load
 var FALLBACK_ROOMS = ["Living Room", "Master bedroom", "Kids", "Office", "Garage"];
 // Bumped every time the page is changed, so you can tell when the phone has the new one.
-var APP_VERSION = "2.1";
+var APP_VERSION = "2.2";
 // ====================================================
 
 var LIFX = "https://api.lifx.com/v1";
@@ -435,7 +435,8 @@ function say(msg, isErr) {
 function fire(id) {
   if (!espReady) { say("Fireplace isn't set up yet", true); return Promise.resolve(false); }
   // no-cors: the ESP32 does the press; we can't read its reply, so assume it worked
-  return fetch(ESP + "/button/" + id + "/press", { method: "POST", mode: "no-cors" })
+  // the box insists on a Content-Length, so send a tiny body
+  return fetch(ESP + "/button/" + id + "/press", { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body: "1" })
     .then(function () {
       say("Fireplace: " + id.replace("_", " "));
       return true;
