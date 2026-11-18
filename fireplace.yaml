@@ -52,6 +52,7 @@ remote_transmitter:
   id: rf_tx
   pin: GPIO4                 # CC1101 GDO0
   carrier_duty_percent: 100%
+  non_blocking: true
   on_transmit:
     then:
       - cc1101.begin_tx
@@ -63,7 +64,7 @@ remote_transmitter:
 # After the codes are captured, change dump to [] and update over WiFi.
 remote_receiver:
   pin: GPIO16                # CC1101 GDO2
-  dump: raw
+  dump: []                   # codes captured 2026-11-17; set back to raw to re-capture
   tolerance: 25%
   filter: 50us
   idle: 6ms
@@ -79,10 +80,15 @@ button:
     on_press:
       - remote_transmitter.transmit_raw:
           transmitter_id: rf_tx
-          code: [500, -500]   # REPLACE: captured "Off" code
+          # Captured 2026-11-17. Short=320/-630, long=630/-310, ~21 ms frame,
+          # remote repeats it every ~53 ms (so ~32 ms gap between copies).
+          code: [320, -630, 630, -310, 630, -310, 630, -310, 630, -310, 630, -310,
+                 630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 630, -310,
+                 630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 630, -310,
+                 630, -310, 320, -630, 630, -310, 630, -310, 630]
           repeat:
-            times: 5
-            wait_time: 10ms
+            times: 10
+            wait_time: 32ms
 
   - platform: template
     name: "fire_on"
@@ -90,10 +96,15 @@ button:
     on_press:
       - remote_transmitter.transmit_raw:
           transmitter_id: rf_tx
-          code: [500, -500]   # REPLACE: captured "On" (ignition) code
+          # Captured 2026-11-17 while holding OFF + up arrow (sent continuously
+          # while held, ~3 s). 80 copies at ~53 ms = about 4 s of "holding".
+          code: [320, -630, 630, -310, 630, -310, 630, -310, 630, -310, 630, -310,
+                 630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 630, -310,
+                 630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 630, -310,
+                 630, -310, 320, -630, 320, -630, 630, -310, 630]
           repeat:
-            times: 10         # raise this if ignition doesn't take
-            wait_time: 10ms
+            times: 80         # raise this if ignition doesn't take
+            wait_time: 32ms
 
   - platform: template
     name: "flame_up"
@@ -101,10 +112,14 @@ button:
     on_press:
       - remote_transmitter.transmit_raw:
           transmitter_id: rf_tx
-          code: [500, -500]   # REPLACE: captured "Flame up" code
+          # Captured 2026-11-17 (same timing as Off, different ending)
+          code: [320, -630, 630, -310, 630, -310, 630, -310, 630, -310, 630, -310,
+                 630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 630, -310,
+                 630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 630, -310,
+                 630, -310, 630, -310, 320, -630, 630, -310, 630]
           repeat:
-            times: 5
-            wait_time: 10ms
+            times: 10
+            wait_time: 32ms
 
   - platform: template
     name: "flame_down"
@@ -112,7 +127,11 @@ button:
     on_press:
       - remote_transmitter.transmit_raw:
           transmitter_id: rf_tx
-          code: [500, -500]   # REPLACE: captured "Flame down" code
+          # Captured 2026-11-17
+          code: [320, -630, 630, -310, 630, -310, 630, -310, 630, -310, 630, -310,
+                 630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 630, -310,
+                 630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 320, -630,
+                 320, -630, 320, -630, 320, -630, 320, -630, 320]
           repeat:
-            times: 5
-            wait_time: 10ms
+            times: 10
+            wait_time: 32ms
