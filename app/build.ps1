@@ -6,8 +6,8 @@
 # phones will refuse to update the app.
 param(
     # Raise both for every new build, or phones won't install it over the old one
-    [int]$VersionCode = 2,
-    [string]$VersionName = "1.1"
+    [int]$VersionCode = 3,
+    [string]$VersionName = "1.2"
 )
 $ErrorActionPreference = 'Stop'
 

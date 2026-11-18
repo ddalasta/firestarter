@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">Dalasta House</string>
     <color name="black">#000000</color>
-    <color name="icon_bg">#17110d</color>
+    <color name="icon_bg">#353a45</color>
     <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/black</item>
         <item name="android:statusBarColor">@color/black</item>

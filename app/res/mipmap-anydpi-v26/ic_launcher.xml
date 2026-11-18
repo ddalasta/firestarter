@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/icon_bg" />
-    <foreground android:drawable="@drawable/ic_flame" />
+    <foreground android:drawable="@drawable/ic_house" />
+    <!-- Android 13+: the shape Pixel's "Themed icons" setting recolors -->
+    <monochrome android:drawable="@drawable/ic_house" />
 </adaptive-icon>
