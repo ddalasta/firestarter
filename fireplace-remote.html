@@ -188,6 +188,23 @@
   @keyframes cffall { to { transform: translate(var(--x, 0), 110vh) rotate(var(--r, 540deg)); opacity: .9; } }
   @media (prefers-reduced-motion: reduce) { #celebrate .cf { display: none; } #celebrate .gs { animation: none; } }
 
+  /* ---------- screen saver ---------- */
+  #saver { position: fixed; inset: 0; z-index: 80; background: #000; display: none; cursor: none; }
+  #saver.on { display: block; animation: saverIn 1.5s ease; }
+  @keyframes saverIn { from { opacity: 0; } }
+  #saverSky { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #saverGlow { position: absolute; left: 0; right: 0; bottom: 0; height: 45%; opacity: 0; transition: opacity 2s;
+    background: radial-gradient(ellipse 70% 100% at 50% 100%, rgba(255,120,40,.28), rgba(255,90,20,.08) 55%, transparent 75%); }
+  #saver.fire #saverGlow { opacity: 1; animation: emberGlow 3.2s ease-in-out infinite alternate; }
+  @keyframes emberGlow { 0% { opacity: .75; } 45% { opacity: 1; } 100% { opacity: .85; } }
+  #saverInfo { position: absolute; left: 0; right: 0; top: 34%; text-align: center; color: rgba(255,244,230,.6);
+    transition: transform 3s ease; }
+  #saverTime { font-size: clamp(64px, 22vw, 150px); font-weight: 300; letter-spacing: 2px; line-height: 1; }
+  #saverDate { font-size: clamp(16px, 4.6vw, 26px); font-weight: 400; margin-top: 10px; color: rgba(255,244,230,.45); letter-spacing: 1px; }
+  #saverFire { display: none; margin-top: 22px; font-size: 17px; color: rgba(255,190,130,.75); }
+  #saverFire .ico { width: 18px; height: 18px; vertical-align: -3px; }
+  #saver.fire #saverFire { display: block; }
+
   #status { position: fixed; left: 16px; right: 16px; bottom: calc(100px + env(safe-area-inset-bottom, 0px)); max-width: 688px; margin: 0 auto;
     background: #2a2a2fee; color: #fff; border: 2px solid transparent; border-radius: 14px; padding: 12px 14px;
     font-size: 16px; opacity: 0; transform: translateY(10px); transition: .25s; pointer-events: none; }
@@ -469,6 +486,15 @@
 
 <div id="status"></div>
 <div id="celebrate" aria-hidden="true"></div>
+<div id="saver" aria-hidden="true">
+  <canvas id="saverSky"></canvas>
+  <div id="saverGlow"></div>
+  <div id="saverInfo">
+    <div id="saverTime"></div>
+    <div id="saverDate"></div>
+    <div id="saverFire"><svg class="ico"><use href="#i-flame"/></svg> Fire is on</div>
+  </div>
+</div>
 
 <script>
 // ===================== SETTINGS =====================
@@ -490,7 +516,7 @@ var FIRE_ROOM = "Living Room";
 // Rooms to show if the LIFX list can't load
 var FALLBACK_ROOMS = ["Living Room", "Master bedroom", "Kids", "Office", "Garage"];
 // Bumped every time the page is changed, so you can tell when the phone has the new one.
-var APP_VERSION = "2.7";
+var APP_VERSION = "2.8";
 // ====================================================
 
 var LIFX = "https://api.lifx.com/v1";
@@ -1089,6 +1115,203 @@ document.addEventListener("pointerdown", function () { lastTouch = Date.now(); }
 setInterval(function () {
   if (Date.now() - lastTouch > TAB_IDLE_MS && $("tabFire").classList.contains("hidden")) showTab("tabFire");
 }, 15000);
+
+// ---------- screen saver ----------
+// After a couple of minutes with nobody touching the Pixel, the screen goes dark with
+// a slow, quiet scene for the season or holiday, plus the time. Everything drifts a
+// little so nothing sits still long enough to burn into the screen. Tap to wake.
+var SAVER_MS = 2 * 60 * 1000;
+var saver = $("saver"), sky = $("saverSky"), ctx = sky.getContext("2d");
+var saverOn = false, parts = [], sceneKey = "", lastFrame = 0, W = 0, H = 0, DPR = 1, rockets = 0;
+
+function seasonScene(d) {
+  var q = /[?&]scene=(\w+)/.exec(location.search);
+  if (q) return q[1];
+  var byTheme = { xmas: "snow", newyear: "fireworks", valentine: "bokeh", stpat: "fireflies",
+                  july4: "fireworks", halloween: "embers", thanks: "leaves" };
+  if (byTheme[THEME.key]) return byTheme[THEME.key];
+  var m = d.getMonth() + 1;
+  if (m === 12 || m <= 2) return "snow";
+  if (m <= 5) return "petals";
+  if (m <= 8) return "fireflies";
+  return "leaves";
+}
+// colors per holiday (muted, so it stays calm and dark)
+function palette() {
+  switch (THEME.key) {
+    case "xmas": return ["#ff5a4a", "#5fd17a", "#ffd27a"];
+    case "newyear": return ["#ffd76a", "#fff1c4", "#d8dde8"];
+    case "july4": return ["#ff4a4a", "#f4f4ff", "#4a7dff"];
+    case "valentine": return ["#ff6f9a", "#ff3f5f", "#ffc0d4"];
+    case "stpat": return ["#8cff7a", "#c8ff8a"];
+    case "thanks": return ["#c8611f", "#a8441a", "#d9902a", "#8a3a16"];
+    default: return null;
+  }
+}
+function rnd(a, b) { return a + Math.random() * (b - a); }
+function pickOf(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function makePart(fresh) {
+  var pal = palette(), p = { x: rnd(0, W), y: fresh ? rnd(0, H) : -20, z: rnd(.3, 1) };
+  switch (sceneKey) {
+    case "snow":
+      p.r = 1 + p.z * 2.6; p.vy = 12 + p.z * 26; p.sway = rnd(0, 6.28); p.a = .25 + p.z * .45; break;
+    case "leaves":
+      p.r = 7 + p.z * 9; p.vy = 14 + p.z * 18; p.sway = rnd(0, 6.28); p.rot = rnd(0, 6.28); p.spin = rnd(-1, 1);
+      p.c = pickOf(pal || ["#b5541c", "#c9862a", "#8e3d17", "#a87a2a", "#7a2e14"]); p.a = .35 + p.z * .35; break;
+    case "petals":
+      p.r = 3 + p.z * 4; p.vy = 10 + p.z * 14; p.sway = rnd(0, 6.28); p.rot = rnd(0, 6.28); p.spin = rnd(-1.5, 1.5);
+      p.c = pickOf(["#f6c9d6", "#f3dbe4", "#fff0f4"]); p.a = .3 + p.z * .35; break;
+    case "fireflies": case "bokeh":
+      p.y = rnd(H * .25, H); p.vx = rnd(-6, 6); p.vy = rnd(-6, 3); p.ph = rnd(0, 6.28);
+      p.r = sceneKey === "bokeh" ? rnd(14, 40) : rnd(1.5, 3);
+      p.c = pickOf(pal || ["#d9ff7a", "#f2ff9a"]); break;
+    case "embers":
+      p.y = fresh ? rnd(H * .4, H) : H + 10; p.vy = -rnd(10, 26); p.vx = rnd(-4, 4); p.r = rnd(1, 2.4);
+      p.ph = rnd(0, 6.28); p.c = pickOf(["#ff8a2a", "#ffb04a", "#ff6a1a"]); break;
+  }
+  return p;
+}
+function burst() {
+  var pal = palette() || ["#ffd76a", "#fff1c4"], c = pickOf(pal), x = rnd(W * .15, W * .85), y = rnd(H * .12, H * .45);
+  for (var i = 0; i < 46; i++) {
+    var ang = (i / 46) * 6.28 + rnd(-.05, .05), sp = rnd(30, 70);
+    parts.push({ fw: 1, x: x, y: y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life: rnd(2.2, 3.2), age: 0, c: c, r: rnd(1, 1.8) });
+  }
+}
+function sizeSky() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = sky.clientWidth; H = sky.clientHeight;
+  sky.width = W * DPR; sky.height = H * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+function startScene() {
+  sceneKey = seasonScene(new Date());
+  sizeSky();
+  parts = [];
+  var n = { snow: 110, leaves: 16, petals: 34, fireflies: 34, bokeh: 16, embers: 50, fireworks: 0 }[sceneKey] || 0;
+  for (var i = 0; i < n; i++) parts.push(makePart(true));
+  rockets = 1;
+}
+function drawLeaf(p) {
+  ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.scale(1, .55 + .45 * Math.abs(Math.cos(p.rot * 1.3)));
+  ctx.globalAlpha = p.a; ctx.fillStyle = p.c;
+  var r = p.r;
+  ctx.beginPath(); ctx.moveTo(-r, 0);
+  ctx.bezierCurveTo(-r * .4, -r * .75, r * .5, -r * .6, r, 0);
+  ctx.bezierCurveTo(r * .5, r * .6, -r * .4, r * .75, -r, 0); ctx.fill();
+  ctx.globalAlpha = p.a * .6; ctx.strokeStyle = "rgba(0,0,0,.5)"; ctx.lineWidth = .8;
+  ctx.beginPath(); ctx.moveTo(-r * 1.25, 0); ctx.lineTo(r * .9, 0); ctx.stroke();
+  ctx.restore();
+}
+function glowDot(x, y, r, c, a) {
+  var g = ctx.createRadialGradient(x, y, 0, x, y, r * 4);
+  g.addColorStop(0, c); g.addColorStop(.25, c); g.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.globalAlpha = Math.max(0, a); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 4, 0, 6.28); ctx.fill();
+}
+function frame(t) {
+  if (!saverOn) return;
+  requestAnimationFrame(frame);
+  if (t - lastFrame < 33) return;           // ~30 frames a second is plenty
+  var dt = lastFrame ? Math.min(.1, (t - lastFrame) / 1000) : .033; lastFrame = t;
+  var sec = t / 1000;
+  ctx.globalAlpha = 1;
+  if (sceneKey === "fireworks") { ctx.fillStyle = "rgba(0,0,0,.18)"; ctx.fillRect(0, 0, W, H); }  // soft trails
+  else ctx.clearRect(0, 0, W, H);
+
+  if (sceneKey === "embers") {               // dim moon + drifting fog
+    glowDot(W * .78, H * .16, 16, "rgba(230,220,190,.5)", .5);
+    ctx.globalAlpha = .55; ctx.fillStyle = "#d9d2bd"; ctx.beginPath(); ctx.arc(W * .78, H * .16, 26, 0, 6.28); ctx.fill();
+    for (var f = 0; f < 3; f++) {
+      var fx = ((sec * (6 + f * 3) + f * 300) % (W + 600)) - 300, fy = H * (.72 + f * .08);
+      var g = ctx.createRadialGradient(fx, fy, 0, fx, fy, 260);
+      g.addColorStop(0, "rgba(120,120,140,.10)"); g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.globalAlpha = 1; ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    }
+  }
+  if (sceneKey === "snow" && THEME.key === "xmas") {   // a few soft holiday lights far away
+    var pal = palette();
+    for (var b = 0; b < 9; b++) {
+      var tw = .5 + .5 * Math.sin(sec * .8 + b * 1.7);
+      glowDot(W * (b + .5) / 9, H * .06 + Math.sin(b * 1.3) * 10, 4, pal[b % 3], .25 + tw * .25);
+    }
+  }
+  if (sceneKey === "fireworks") {
+    rockets -= dt;
+    if (rockets <= 0) { burst(); rockets = rnd(3.5, 6.5); }
+  }
+
+  for (var i = parts.length - 1; i >= 0; i--) {
+    var p = parts[i];
+    if (p.fw) {
+      p.age += dt; p.vy += 22 * dt; p.vx *= .985; p.vy *= .985; p.x += p.vx * dt; p.y += p.vy * dt;
+      var life = 1 - p.age / p.life;
+      if (life <= 0) { parts.splice(i, 1); continue; }
+      glowDot(p.x, p.y, p.r, p.c, life * .7);
+      continue;
+    }
+    switch (sceneKey) {
+      case "snow":
+        p.y += p.vy * dt; p.x += Math.sin(sec * .6 + p.sway) * 10 * dt * p.z;
+        ctx.globalAlpha = p.a; ctx.fillStyle = "#eef3ff"; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.28); ctx.fill();
+        break;
+      case "leaves": case "petals":
+        p.y += p.vy * dt; p.x += Math.sin(sec * .7 + p.sway) * 22 * dt; p.rot += p.spin * dt;
+        if (sceneKey === "leaves") drawLeaf(p);
+        else { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.globalAlpha = p.a; ctx.fillStyle = p.c;
+               ctx.beginPath(); ctx.ellipse(0, 0, p.r, p.r * .55, 0, 0, 6.28); ctx.fill(); ctx.restore(); }
+        break;
+      case "fireflies":
+        p.x += (p.vx + Math.sin(sec * .5 + p.ph) * 6) * dt; p.y += (p.vy + Math.cos(sec * .4 + p.ph) * 5) * dt;
+        glowDot(p.x, p.y, p.r, p.c, Math.max(0, Math.sin(sec * .9 + p.ph)) * .6);
+        break;
+      case "bokeh":
+        p.x += p.vx * dt * .5; p.y += (p.vy - 4) * dt * .5;
+        ctx.globalAlpha = .05 + (.5 + .5 * Math.sin(sec * .4 + p.ph)) * .07; ctx.fillStyle = p.c;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.28); ctx.fill();
+        break;
+      case "embers":
+        p.y += p.vy * dt; p.x += (p.vx + Math.sin(sec * 1.3 + p.ph) * 8) * dt;
+        glowDot(p.x, p.y, p.r, p.c, .35 + .3 * Math.sin(sec * 3 + p.ph));
+        break;
+    }
+    // replace when it drifts off screen
+    if (p.y > H + 30 || p.y < -60 || p.x < -60 || p.x > W + 60) parts[i] = makePart(sceneKey === "fireflies" || sceneKey === "bokeh");
+  }
+  ctx.globalAlpha = 1;
+}
+var DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+function saverClock() {
+  var d = new Date(), h = d.getHours() % 12 || 12, m = ("0" + d.getMinutes()).slice(-2);
+  $("saverTime").textContent = h + ":" + m;
+  $("saverDate").textContent = DAYS[d.getDay()] + ", " + MONTHS[d.getMonth()] + " " + d.getDate();
+  saver.classList.toggle("fire", $("fireScene").classList.contains("show"));
+  // move the clock a little every so often so it never burns in
+  $("saverInfo").style.transform = "translate(" + Math.round(rnd(-8, 8)) + "vw," + Math.round(rnd(-10, 14)) + "vh)";
+}
+function showSaver() {
+  if (saverOn) return;
+  saverOn = true; saver.classList.add("on");
+  startScene(); saverClock(); lastFrame = 0;
+  requestAnimationFrame(frame);
+}
+function hideSaver() {
+  if (!saverOn) return;
+  saverOn = false; saver.classList.remove("on");
+  lastTouch = Date.now();
+}
+// a tap on the saver only wakes the screen; it never presses a button underneath
+saver.addEventListener("pointerdown", function (e) { e.preventDefault(); e.stopPropagation(); hideSaver(); });
+saver.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); });
+window.addEventListener("resize", function () { if (saverOn) sizeSky(); });
+var saverTicks = 0;
+setInterval(function () {
+  if (saverOn) { if (++saverTicks % 4 === 0) saverClock(); else $("saverTime").textContent = (new Date().getHours() % 12 || 12) + ":" + ("0" + new Date().getMinutes()).slice(-2); return; }
+  var typing = document.activeElement && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName);
+  if (!typing && Date.now() - lastTouch > SAVER_MS) showSaver();
+}, 15000);
+if (/[?&]saver\b/.test(location.search)) setTimeout(showSaver, 300);
 
 // ---------- start ----------
 setFlameLevel(3);

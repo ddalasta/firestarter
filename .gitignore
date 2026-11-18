@@ -5,3 +5,5 @@ Firestarter.md
 # ESP32 secrets and build files: never upload
 secrets.yaml
 .esphome/
+private/
+dog-preview.html
