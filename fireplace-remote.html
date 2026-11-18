@@ -545,7 +545,7 @@ var FIRE_ROOM = "Living Room";
 // Rooms to show if the LIFX list can't load
 var FALLBACK_ROOMS = ["Living Room", "Master bedroom", "Kids", "Office", "Garage"];
 // Bumped every time the page is changed, so you can tell when the phone has the new one.
-var APP_VERSION = "3.0";
+var APP_VERSION = "3.1";
 // ====================================================
 
 var LIFX = "https://api.lifx.com/v1";
@@ -780,6 +780,10 @@ function syncFromBox() {
 setInterval(syncFromBox, 4000);
 document.addEventListener("visibilitychange", syncFromBox);
 syncFromBox();
+// The box's built-in page opens a live "events" line to the box before this page
+// replaces it. We never use it, and the box only has room for 5 connections, so
+// hang up. Otherwise every open phone holds one of the 5 for as long as it's open.
+try { if (ON_BOX && window.source && window.source.close) window.source.close(); } catch (e) {}
 
 // Flame up / down make the pretend fire bigger or smaller (it's a guess:
 // the real fireplace doesn't tell us its flame height)
