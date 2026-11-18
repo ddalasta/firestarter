@@ -133,7 +133,12 @@
   input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 46px;
     border-radius: 6px; background: #fff; border: 2px solid rgba(0,0,0,.6); box-shadow: 0 2px 6px rgba(0,0,0,.6); }
   input[type=range]::-moz-range-thumb { width: 10px; height: 44px; border-radius: 6px; background: #fff; border: 2px solid rgba(0,0,0,.6); }
-  #kelvin { background: linear-gradient(90deg, #ff8a2a, #ffd6a0, #fff4e8, #cfe2ff); }
+  #kelvin { position: relative; height: 34px; border-radius: 12px; touch-action: pan-y; cursor: ew-resize;
+    -webkit-touch-callout: none; box-shadow: 0 0 0 2px var(--line);
+    background: linear-gradient(90deg, #ff8a2a, #ffd6a0, #fff4e8, #cfe2ff); }
+  #kelvinHandle { position: absolute; top: -6px; bottom: -6px; width: 12px; margin-left: -6px; border-radius: 6px;
+    background: #fff; border: 2px solid rgba(0,0,0,.6); box-shadow: 0 2px 6px rgba(0,0,0,.6); pointer-events: none; }
+  #kelvin.grab { box-shadow: 0 0 0 3px var(--glow), 0 0 24px 8px var(--glow-soft); }
   #kelvin.dim { opacity: .45; }
 
   /* ===== TABS ===== */
@@ -439,7 +444,7 @@
 
   <div class="row">
     <label><span>Warm ↔ Cool white</span><span id="kelvinVal"></span></label>
-    <input type="range" id="kelvin" min="1500" max="9000" step="100" value="2700">
+    <div id="kelvin"><div id="kelvinHandle"></div></div>
   </div>
 </section>
 </div>
@@ -485,7 +490,7 @@ var FIRE_ROOM = "Living Room";
 // Rooms to show if the LIFX list can't load
 var FALLBACK_ROOMS = ["Living Room", "Master bedroom", "Kids", "Office", "Garage"];
 // Bumped every time the page is changed, so you can tell when the phone has the new one.
-var APP_VERSION = "2.5";
+var APP_VERSION = "2.6";
 // ====================================================
 
 var LIFX = "https://api.lifx.com/v1";
@@ -796,7 +801,7 @@ PRESETS.forEach(function (p) {
     if (p.special === "theme") { markMode("color"); themeLights(THEME).then(function (ok) { if (ok) celebrate(THEME); }); return; }
     var m;
     if ((m = /^kelvin:(\d+)/.exec(p.color))) {
-      markMode("white"); $("kelvin").value = m[1]; $("kelvinVal").textContent = m[1] + "K";
+      markMode("white"); placeKelvin(+m[1]);
     } else if ((m = /^hue:(\d+)/.exec(p.color))) {
       markMode("color"); placeDot(+m[1], 1);
     }
@@ -942,16 +947,20 @@ draggable($("dimmer"), function (x, y, r) {
 placeDim(60);
 
 // ---------- warm / cool white ----------
-(function () {
-  var el = $("kelvin");
-  function show() { $("kelvinVal").textContent = el.value + "K"; }
-  var last = el.value;
-  function send() { markPreset(null); markMode("white"); queue({ color: "kelvin:" + el.value }); last = el.value; }
-  function guard() { if (!selector) { el.value = last; show(); needRoom(); return true; } usedLights(); return false; }
-  el.addEventListener("input", function () { if (guard()) return; show(); send(); });
-  el.addEventListener("change", function () { if (guard()) return; send(); });
-  show();
-})();
+// Same press-and-hold as the wheel and dimmer: a swipe scrolls, a hold grabs.
+var K_MIN = 1500, K_MAX = 9000;
+function placeKelvin(k) {
+  $("kelvinHandle").style.left = ((k - K_MIN) / (K_MAX - K_MIN) * 100) + "%";
+  $("kelvinVal").textContent = k + "K";
+}
+draggable($("kelvin"), function (x, y, r) {
+  var k = K_MIN + Math.round((x / r.width) * (K_MAX - K_MIN) / 100) * 100;
+  k = Math.max(K_MIN, Math.min(K_MAX, k));
+  placeKelvin(k);
+  markPreset(null); markMode("white");
+  queue({ color: "kelvin:" + k });
+});
+placeKelvin(2700);
 
 // ---------- scenes ----------
 $("cozy").addEventListener("click", function () {
