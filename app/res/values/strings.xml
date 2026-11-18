@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Fireplace</string>
+    <string name="app_name">Dalasta House</string>
     <color name="black">#000000</color>
     <color name="icon_bg">#17110d</color>
     <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">

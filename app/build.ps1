@@ -5,8 +5,9 @@
 # never uploaded. Every later version MUST be signed with that same key, or
 # phones will refuse to update the app.
 param(
-    [int]$VersionCode = 1,
-    [string]$VersionName = "1.0"
+    # Raise both for every new build, or phones won't install it over the old one
+    [int]$VersionCode = 2,
+    [string]$VersionName = "1.1"
 )
 $ErrorActionPreference = 'Stop'
 
