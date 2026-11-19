@@ -421,6 +421,21 @@
   #tabFire section.compact .sleeprow { margin-top: calc(6px + 4 * var(--s)); }
   /* the sleep timer's explaining line only shows where there is room for it */
   @media (max-height: 907px) { #tabFire section.compact .note { display: none; } }
+  /* Lights tab: the same idea. The color wheel and the dimmer shrink the most. */
+  #tabLights section { padding: calc(10px + 6 * var(--s)); }
+  #tabLights h2 { margin-bottom: calc(6px + 6 * var(--s)); }
+  #tabLights .pickrow { margin-bottom: calc(6px + 6 * var(--s)); }
+  #tabLights .pickrow select { padding-top: calc(9px + 3 * var(--s)); padding-bottom: calc(9px + 3 * var(--s)); }
+  #tabLights .powerrow { margin-bottom: calc(6px + 6 * var(--s)); }
+  #tabLights .powerrow button { padding: calc(12px + 6 * var(--s)) 10px; }
+  #tabLights .swatches { gap: calc(8px + 2 * var(--s)); margin-bottom: calc(8px + 6 * var(--s)); }
+  #tabLights .sw { height: calc(40px + 16 * var(--s)); }
+  #tabLights .wheelwrap { max-width: calc(160px + 140 * var(--s)); }
+  #dimmer { min-height: calc(104px + 96 * var(--s)); }
+  #tabLights .row { margin-top: calc(6px + 8 * var(--s)); }
+  #tabLights .row label { margin-bottom: calc(5px + 3 * var(--s)); }
+  /* on the shortest screens the small "LIGHTS" label goes (the big title says it already) */
+  @media (max-height: 760px) { #tabLights h2 { display: none; } }
   /* ===== end FIT ANY PHONE ===== */
 </style>
 </head>
@@ -687,7 +702,7 @@ var FIRE_ROOM = "Living Room";
 // Rooms to show if the LIFX list can't load
 var FALLBACK_ROOMS = ["Living Room", "Master bedroom", "Kids", "Office", "Garage"];
 // Bumped every time the page is changed, so you can tell when the phone has the new one.
-var APP_VERSION = "3.5";
+var APP_VERSION = "3.6";
 // ====================================================
 
 var LIFX = "https://api.lifx.com/v1";
