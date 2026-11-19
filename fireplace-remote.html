@@ -806,7 +806,7 @@ var FIRE_ROOM = "Living Room";
 // Rooms to show if the LIFX list can't load
 var FALLBACK_ROOMS = ["Living Room", "Master bedroom", "Kids", "Office", "Garage"];
 // Bumped every time the page is changed, so you can tell when the phone has the new one.
-var APP_VERSION = "3.8";
+var APP_VERSION = "3.9";
 // ====================================================
 
 var LIFX = "https://api.lifx.com/v1";
@@ -849,6 +849,18 @@ function themeFor(d) {
   return SOUNDERS_THEME;
 }
 var THEME = themeFor(new Date());
+// The holiday button always shows a holiday: the one happening now, or else the next one coming up.
+function holidayFor(d) {
+  var t = themeFor(d);
+  if (t !== SOUNDERS_THEME) return t;
+  var md = (d.getMonth() + 1) * 100 + d.getDate(), best = THEMES[0], bestGap = 1e9;
+  THEMES.forEach(function (x) {
+    var a = x.from[0] * 100 + x.from[1], gap = a >= md ? a - md : a + 1300 - md;
+    if (gap < bestGap) { bestGap = gap; best = x; }
+  });
+  return best;
+}
+var HOLIDAY = holidayFor(new Date());
 // button background: solid color blocks that blend a little where they meet
 function themeBg(css) {
   var n = css.length, stops = [];
@@ -869,7 +881,8 @@ var PRESETS = [
   { name: "Movie",   color: "hue:0 saturation:1",   bg: "#ff4040" },
   { name: "Sounders", theme: SOUNDERS_THEME, bg: themeBg(SOUNDERS_THEME.css), fg: "#fff" },
   { name: "Blue",    color: "hue:220 saturation:1", bg: "#4d8cff" },
-  { name: "Green",   color: "hue:120 saturation:1", bg: "#54e06b" }
+  // the holiday button (where Green used to be): changes by itself with the date
+  { name: HOLIDAY.name, theme: HOLIDAY, bg: themeBg(HOLIDAY.css), fg: "#fff" }
 ];
 
 var $ = function (id) { return document.getElementById(id); };
@@ -1371,8 +1384,6 @@ function showRealLights() {
 }
 
 // ---------- presets ----------
-// The holiday button is its own wide button, added only during a holiday's dates.
-if (THEME !== SOUNDERS_THEME) PRESETS.push({ name: THEME.name, theme: THEME, bg: themeBg(THEME.css), fg: "#fff", holiday: true });
 PRESETS.forEach(function (p) {
   var b = document.createElement("button");
   b.className = "sw" + (p.holiday ? " holiday" : ""); b.textContent = p.name; b.style.background = p.bg;
