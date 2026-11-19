@@ -496,7 +496,9 @@
      gaps, the buttons and the fire picture all shrink together, smoothly. */
   :root { --s: clamp(0px, calc((100vh - 700px) / 208), 1px); }
   @supports (height: 100dvh) { :root { --s: clamp(0px, calc((100dvh - 700px) / 208), 1px); } }
-  h1 { font-size: calc(20px + 6 * var(--s)); margin: calc(4 * var(--s)) 0 calc(6px + 8 * var(--s)); }
+  /* --s1 is the same dial but never above 1px (the title doesn't grow when the Lights tab does) */
+  :root { --s1: min(var(--s), 1px); }
+  h1 { font-size: calc(20px + 6 * var(--s1)); margin: calc(4 * var(--s1)) 0 calc(6px + 8 * var(--s1)); }
   #tabFire section { padding: calc(10px + 6 * var(--s)); margin-bottom: calc(8px + 6 * var(--s)); }
   #tabFire section.compact { padding: calc(8px + 4 * var(--s)) calc(10px + 4 * var(--s)); }
   #tabFire h2 { margin-bottom: calc(6px + 6 * var(--s)); }
@@ -517,8 +519,11 @@
   #tabLights .lighttop { margin-bottom: calc(8px + 6 * var(--s)); }
   #tabLights .pickrow select { font-size: 16px; padding-top: calc(7px + 3 * var(--s)); padding-bottom: calc(7px + 3 * var(--s)); }
   #tabLights .swatches { gap: calc(7px + 2 * var(--s)); margin-bottom: calc(8px + 6 * var(--s)); }
-  #tabLights .sw { height: calc(36px + 8 * var(--s)); font-size: 14px; border-radius: 14px; }
-  #tabLights .wheelwrap { max-width: calc(140px + 40 * var(--s)); margin-bottom: calc(8px + 6 * var(--s)); }
+  /* On the Lights tab the dial may also go ABOVE 1px: when a phone has room to spare, everything
+     grows until the box ends about 3 cm above the tab bar (see fitScreen). */
+  #tabLights .sw { height: calc(36px + 8 * var(--s)); font-size: calc(13px + 1 * var(--s)); border-radius: 14px; }
+  #tabLights .wheelwrap { max-width: min(calc(140px + 40 * var(--s)), 250px); margin-bottom: calc(8px + 6 * var(--s)); }
+  #tabLights #dimmer { height: calc(30px + 4 * var(--s)); }
   #tabLights .fbtn { width: calc(38px + 6 * var(--s)); height: calc(38px + 6 * var(--s)); }
   /* Used for a split second while the page measures itself (see fitScreen): the
      Fireplace tab is measured as if the fire picture and the Safety line were
@@ -806,7 +811,7 @@ var FIRE_ROOM = "Living Room";
 // Rooms to show if the LIFX list can't load
 var FALLBACK_ROOMS = ["Living Room", "Master bedroom", "Kids", "Office", "Garage"];
 // Bumped every time the page is changed, so you can tell when the phone has the new one.
-var APP_VERSION = "3.9";
+var APP_VERSION = "4.0";
 // ====================================================
 
 var LIFX = "https://api.lifx.com/v1";
@@ -1823,18 +1828,24 @@ function fitScreen() {
   var secs = tab.querySelectorAll("section"), last = secs[secs.length - 1];
   if (!last || !bar.offsetHeight) return;
   body.classList.add("fitprobe", "notrans");
-  function over(s) {
+  // does the last box end less than "gap" pixels above the tab bar when the dial is at s?
+  function over(s, gap) {
     root.style.setProperty("--s", s + "px");
-    return last.getBoundingClientRect().bottom + window.scrollY > bar.getBoundingClientRect().top - 8;
+    return last.getBoundingClientRect().bottom + window.scrollY > bar.getBoundingClientRect().top - (gap || 8);
+  }
+  // the biggest dial setting between lo and hi that still leaves the gap
+  function biggest(lo, hi, gap) {
+    for (var i = 0; i < 7; i++) { var mid = (lo + hi) / 2; if (over(mid, gap)) hi = mid; else lo = mid; }
+    return lo;
   }
   var s = 1;
   if (over(1)) {
-    if (over(FIT_MIN)) s = FIT_MIN;
-    else {
-      var lo = FIT_MIN, hi = 1;
-      for (var i = 0; i < 7; i++) { var mid = (lo + hi) / 2; if (over(mid)) hi = mid; else lo = mid; }
-      s = lo;
-    }
+    s = over(FIT_MIN) ? FIT_MIN : biggest(FIT_MIN, 1);
+  } else if (tab.id === "tabLights") {
+    // Room to spare on the Lights tab: grow it until its box ends about 3 cm above
+    // the tab bar (3 cm is 113 px to a web page), but never more than GROW_MAX.
+    var GROW_MAX = 2.4, GAP_3CM = 113;
+    if (!over(1, GAP_3CM)) s = over(GROW_MAX, GAP_3CM) ? biggest(1, GROW_MAX, GAP_3CM) : GROW_MAX;
   }
   root.style.setProperty("--s", s.toFixed(3) + "px");
   // put the fire picture back as it was, without it animating
