@@ -13,6 +13,7 @@ substitutions:
   wait_after_off: "90"     # seconds: after Fire off, Fire on rests this long (family chose 1:30;
                            # a Valor GV60 manual says 2 min, so 120 is the by-the-book value)
   flame_gap_ms: "1000"     # milliseconds between Flame up / Flame down presses
+  flame_steps: "23"        # taps from the highest flame to the lowest (Clare counted 23 on 2026-11-18)
 
 esphome:
   name: fireplace
@@ -108,9 +109,21 @@ globals:
     type: uint32_t
     restore_value: no
     initial_value: "0"
+  # The box's count of where the flame is: flame_steps = highest, 0 = lowest.
+  # The fireplace never tells us, so this is counted: lighting sets it to the
+  # highest (the valve runs to full by itself after lighting), each Flame up /
+  # Flame down that is sent moves it one step, and it stops at the two ends
+  # like the real valve does. If it ever drifts, tapping all the way to one
+  # end lines it up again. Saved, so a restart doesn't forget it.
+  - id: flame_level
+    type: int
+    restore_value: yes
+    initial_value: "${flame_steps}"
 
-# One line the phones read every few seconds, e.g. "safety=222;on_wait=45;flame_wait=0;light=60"
-# (light = how many seconds lighting takes, for the phones' lighting animation)
+# One line the phones read every few seconds, e.g.
+# "safety=222;on_wait=45;flame_wait=0;light=60;level=23;steps=23"
+# (light = how many seconds lighting takes, for the phones' lighting animation;
+#  level / steps = the flame level count and its highest value)
 text_sensor:
   - platform: template
     name: "fire_status"
@@ -163,9 +176,10 @@ script:
     then:
       - lambda: |-
           float mins = id(safety_minutes_left).state;
-          char buf[80];
-          snprintf(buf, sizeof(buf), "safety=%d;on_wait=%d;flame_wait=%d;light=%d",
-                   std::isnan(mins) ? 0 : (int) mins, id(on_wait_s), id(flame_wait_s), ${wait_after_on});
+          char buf[112];
+          snprintf(buf, sizeof(buf), "safety=%d;on_wait=%d;flame_wait=%d;light=%d;level=%d;steps=%d",
+                   std::isnan(mins) ? 0 : (int) mins, id(on_wait_s), id(flame_wait_s), ${wait_after_on},
+                   id(flame_level), ${flame_steps});
           if (id(fire_status).state != buf) id(fire_status).publish_state(buf);
   - id: safety_shutoff
     mode: single
@@ -224,6 +238,7 @@ button:
                 id(on_wait_s) = ${wait_after_on};
                 id(off_wait) = false;
                 id(flame_wait_s) = ${wait_after_on};
+                id(flame_level) = ${flame_steps};   // lighting runs the flame to full
             - number.set:
                 id: safety_minutes_left
                 value: 240          # start the 4-hour safety countdown
@@ -250,8 +265,10 @@ button:
               if (id(flame_wait_s) > 0) return false;
               if (millis() - id(last_flame_ms) < ${flame_gap_ms}) return false;
               id(last_flame_ms) = millis();
+              if (id(flame_level) < ${flame_steps}) id(flame_level)++;
               return true;
           then:
+            - script.execute: publish_status
             - remote_transmitter.transmit_raw:
                 transmitter_id: rf_tx
                 # Captured 2026-11-17 (same timing as Off, different ending)
@@ -273,8 +290,10 @@ button:
               if (id(flame_wait_s) > 0) return false;
               if (millis() - id(last_flame_ms) < ${flame_gap_ms}) return false;
               id(last_flame_ms) = millis();
+              if (id(flame_level) > 0) id(flame_level)--;
               return true;
           then:
+            - script.execute: publish_status
             - remote_transmitter.transmit_raw:
                 transmitter_id: rf_tx
                 # Captured 2026-11-17

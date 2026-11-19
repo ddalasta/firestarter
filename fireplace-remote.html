@@ -75,6 +75,13 @@
   button.off { background: #2c2c31; }
   /* a button the box is making wait (cooldown): dim, and it shows a countdown */
   button.wait { opacity: .45; filter: saturate(.4); }
+  /* flame level: a thin bar under the flame buttons, shown while the fire is on */
+  .flamebar { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 15px; color: var(--muted); }
+  .flamebar.hidden { display: none; }
+  .fbtrack { flex: 1; height: 10px; border-radius: 5px; background: var(--panel-2); border: 1px solid var(--line); overflow: hidden; }
+  .fbfill { height: 100%; width: 100%; border-radius: 5px; background: linear-gradient(90deg, var(--fire), var(--fire-2));
+    transition: width .5s ease; }
+  .flamebar b { min-width: 3.4em; text-align: right; color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
   button.scene { padding: 22px 10px; font-size: 20px; }
 
   /* room / bulb chips */
@@ -498,6 +505,11 @@
     <button data-fire="flame_up"><svg class="ico flame"><use href="#i-flame"/></svg> Flame up</button>
     <button data-fire="flame_down"><svg class="ico flame down"><use href="#i-flame"/></svg> Flame down</button>
   </div>
+  <div class="flamebar hidden" id="flameBar">
+    <span>Flame level</span>
+    <div class="fbtrack"><div class="fbfill" id="flameFill"></div></div>
+    <b id="flameTxt"></b>
+  </div>
   <p class="note hidden" id="safetyNote" style="margin:12px 0 0"></p>
 </section>
 
@@ -624,7 +636,7 @@ var FIRE_ROOM = "Living Room";
 // Rooms to show if the LIFX list can't load
 var FALLBACK_ROOMS = ["Living Room", "Master bedroom", "Kids", "Office", "Garage"];
 // Bumped every time the page is changed, so you can tell when the phone has the new one.
-var APP_VERSION = "3.2";
+var APP_VERSION = "3.3";
 // ====================================================
 
 var LIFX = "https://api.lifx.com/v1";
@@ -763,10 +775,11 @@ each("[data-fire]", function (b) {
     function go() {
       markScene(null);
       if (id === "fire_on" || id === "fire_off") markFire(id);
-      if (id === "fire_on") startLighting(Date.now());
-      else {
+      if (id === "fire_on") { startLighting(Date.now()); setFlameLevel(FLAME_STEPS); }
+      else if (id !== "fire_off") {
         flash(b);
         setFlameLevel(flameLevel + (id === "flame_up" ? 1 : -1));
+        setTimeout(syncFromBox, 1600);
       }
       fire(id);
     }
@@ -837,6 +850,7 @@ function markFire(id) {
   });
   // the little fire scene in the Fireplace box shows while the fire is on
   $("fireScene").classList.toggle("show", id === "fire_on");
+  showFlameBar(id === "fire_on");
   if (id !== "fire_on") stopLighting();
 }
 // ---------- lighting animation ----------
@@ -917,7 +931,8 @@ function readBox() {
       if (v.indexOf("safety=") === 0) {
         var o = {};
         v.split(";").forEach(function (kv) { var p = kv.split("="); o[p[0]] = parseFloat(p[1]); });
-        return { mins: o.safety, on: o.on_wait || 0, flame: o.flame_wait || 0, light: o.light || 60, live: true };
+        return { mins: o.safety, on: o.on_wait || 0, flame: o.flame_wait || 0, light: o.light || 60, live: true,
+                 level: o.level, steps: o.steps };
       }
       return fetch("/number/safety_minutes_left", { cache: "no-store" })
         .then(function (r) { return r.ok ? r.json() : null; })
@@ -936,6 +951,11 @@ function syncFromBox() {
       if (!st || isNaN(st.mins)) return;
       onWait = st.on; flameWait = st.flame; waitHeard = Date.now();
       showWaits();
+      // the flame level is the box's count (right after a tap here, trust the tap for a moment)
+      if (st.steps > 0 && !isNaN(st.level)) {
+        boxHasLevel = true;
+        if (Date.now() - lastFlameTap > 1500) { FLAME_STEPS = st.steps; setFlameLevel(st.level); }
+      }
       // right after a press on this phone, trust the press until the box catches up
       if (Date.now() - lastFirePress > 3000) markFire(st.mins >= 1 ? "fire_on" : "fire_off");
       showSafety(st.mins);
@@ -956,12 +976,22 @@ syncFromBox();
 // hang up. Otherwise every open phone holds one of the 5 for as long as it's open.
 try { if (ON_BOX && window.source && window.source.close) window.source.close(); } catch (e) {}
 
-// Flame up / down make the pretend fire bigger or smaller (it's a guess:
-// the real fireplace doesn't tell us its flame height)
-var flameLevel = 3;
+// ---------- flame level ----------
+// The real fireplace never says how high its flame is, so the box counts it:
+// lighting = highest, and each Flame up / down it sends moves the count one
+// step (FLAME_STEPS taps from top to bottom). Every phone shows the box's
+// count as a bar, and the pretend fire grows and shrinks with it.
+var FLAME_STEPS = 23, flameLevel = 23;
+var boxHasLevel = false;      // true once the box has told us its count
 function setFlameLevel(n) {
-  flameLevel = Math.max(1, Math.min(5, n));
-  $("flameGroup").style.transform = "scale(" + (0.6 + flameLevel * 0.13) + ")";
+  flameLevel = Math.max(0, Math.min(FLAME_STEPS, n));
+  var part = flameLevel / FLAME_STEPS;
+  $("flameGroup").style.transform = "scale(" + (0.4 + part * 0.7) + ")";
+  $("flameFill").style.width = Math.max(4, Math.round(part * 100)) + "%";
+  $("flameTxt").textContent = flameLevel >= FLAME_STEPS ? "Full" : flameLevel <= 0 ? "Lowest" : Math.round(part * 100) + "%";
+}
+function showFlameBar(fireOn) {
+  $("flameBar").classList.toggle("hidden", !(boxHasLevel && fireOn));
 }
 function markScene(id) {
   $("cozy").classList.toggle("on", id === "cozy");
@@ -1264,7 +1294,7 @@ placeKelvin(2700);
 // ---------- scenes ----------
 $("cozy").addEventListener("click", function () {
   function go(lightsOnly) {
-    if (!lightsOnly) { fire("fire_on"); markFire("fire_on"); startLighting(Date.now()); }
+    if (!lightsOnly) { fire("fire_on"); markFire("fire_on"); startLighting(Date.now()); setFlameLevel(FLAME_STEPS); }
     markScene("cozy"); markPreset(null); markPower("lon"); markMode("white");
     setState({ power: "on", color: "kelvin:2200", brightness: 0.35, duration: 2 }, "group:" + FIRE_ROOM)
       .then(sayIf(lightsOnly ? "Cozy lights. Fire on is resting for " + mmss(boxWait("on")) : "Cozy time"));
@@ -1591,7 +1621,7 @@ setInterval(function () {
 if (/[?&]saver\b/.test(location.search)) setTimeout(showSaver, 300);
 
 // ---------- start ----------
-setFlameLevel(3);
+setFlameLevel(FLAME_STEPS);
 if (!espReady) {
   $("fireNote").classList.remove("hidden");
   $("fireBtns").style.opacity = ".75";
