@@ -7,9 +7,19 @@
 #   GPIO18 -> 5 SCK     GPIO23 -> 6 MOSI
 #   GPIO19 -> 7 MISO    GPIO16 -> 8 GDO2 (RX)
 
+# ---------- Cooldown times (change here, then update the box) ----------
+substitutions:
+  wait_after_on: "60"      # seconds: after Fire on, Fire on and the flame arrows rest this long
+  wait_after_off: "120"    # seconds: after Fire off, Fire on rests this long (Valor manual: 2 min)
+  flame_gap_ms: "1000"     # milliseconds between Flame up / Flame down presses
+
 esphome:
   name: fireplace
   friendly_name: Fireplace
+  on_boot:
+    priority: -100
+    then:
+      - script.execute: publish_status
 
 esp32:
   board: esp32dev
@@ -73,6 +83,34 @@ remote_receiver:
   idle: 6ms
   buffer_size: 4kb
 
+# ---------- Cooldowns ----------
+# The box refuses "Fire on" while on_wait_s is above 0, and refuses the flame
+# arrows while flame_wait_s is above 0 or less than flame_gap_ms after the last
+# one. "Fire off" is never refused. After a restart the box can't know when the
+# fire was last on, so it starts with the full after-off wait.
+globals:
+  - id: on_wait_s
+    type: int
+    restore_value: no
+    initial_value: "${wait_after_off}"
+  - id: flame_wait_s
+    type: int
+    restore_value: no
+    initial_value: "0"
+  - id: last_flame_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: "0"
+
+# One line the phones read every few seconds, e.g. "safety=222;on_wait=45;flame_wait=0;light=60"
+# (light = how many seconds lighting takes, for the phones' lighting animation)
+text_sensor:
+  - platform: template
+    name: "fire_status"
+    id: fire_status
+    icon: "mdi:fire"
+    update_interval: never
+
 # ---------- Backup safety timer ----------
 # Whenever the box turns the fire on, it starts counting down 4 hours. When the
 # count reaches 0 the box turns the fire off by itself, even if the phone, the
@@ -94,6 +132,12 @@ number:
     initial_value: 0
 
 interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          if (id(on_wait_s) > 0) id(on_wait_s)--;
+          if (id(flame_wait_s) > 0) id(flame_wait_s)--;
+          id(publish_status).execute();
   - interval: 1min
     then:
       - lambda: |-
@@ -106,6 +150,16 @@ interval:
           }
 
 script:
+  # Sends the status line, but only when something in it changed
+  - id: publish_status
+    mode: single
+    then:
+      - lambda: |-
+          float mins = id(safety_minutes_left).state;
+          char buf[80];
+          snprintf(buf, sizeof(buf), "safety=%d;on_wait=%d;flame_wait=%d;light=%d",
+                   std::isnan(mins) ? 0 : (int) mins, id(on_wait_s), id(flame_wait_s), ${wait_after_on});
+          if (id(fire_status).state != buf) id(fire_status).publish_state(buf);
   - id: safety_shutoff
     mode: single
     then:
@@ -124,9 +178,14 @@ button:
     name: "fire_off"
     id: fire_off
     on_press:
+      # Never refused. Starts the wait before the fire may be lit again.
+      - lambda: |-
+          id(on_wait_s) = ${wait_after_off};
+          id(flame_wait_s) = 0;
       - number.set:
           id: safety_minutes_left
           value: 0
+      - script.execute: publish_status
       - remote_transmitter.transmit_raw:
           transmitter_id: rf_tx
           # Captured 2026-11-17. Short=320/-630, long=630/-310, ~21 ms frame,
@@ -143,47 +202,76 @@ button:
     name: "fire_on"
     id: fire_on
     on_press:
-      - number.set:
-          id: safety_minutes_left
-          value: 240          # start the 4-hour safety countdown
-      - remote_transmitter.transmit_raw:
-          transmitter_id: rf_tx
-          # Captured 2026-11-17 while holding OFF + up arrow (sent continuously
-          # while held, ~3 s). 80 copies at ~53 ms = about 4 s of "holding".
-          code: [320, -630, 630, -310, 630, -310, 630, -310, 630, -310, 630, -310,
-                 630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 630, -310,
-                 630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 630, -310,
-                 630, -310, 320, -630, 320, -630, 630, -310, 630]
-          repeat:
-            times: 80         # raise this if ignition doesn't take
-            wait_time: 32ms
+      - if:
+          condition:
+            lambda: "return id(on_wait_s) > 0;"
+          then:
+            - logger.log:
+                level: WARN
+                format: "Fire on ignored: %d s of cooldown left"
+                args: ["id(on_wait_s)"]
+          else:
+            - lambda: |-
+                id(on_wait_s) = ${wait_after_on};
+                id(flame_wait_s) = ${wait_after_on};
+            - number.set:
+                id: safety_minutes_left
+                value: 240          # start the 4-hour safety countdown
+            - script.execute: publish_status
+            - remote_transmitter.transmit_raw:
+                transmitter_id: rf_tx
+                # Captured 2026-11-17 while holding OFF + up arrow (sent continuously
+                # while held, ~3 s). 80 copies at ~53 ms = about 4 s of "holding".
+                code: [320, -630, 630, -310, 630, -310, 630, -310, 630, -310, 630, -310,
+                       630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 630, -310,
+                       630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 630, -310,
+                       630, -310, 320, -630, 320, -630, 630, -310, 630]
+                repeat:
+                  times: 80         # raise this if ignition doesn't take
+                  wait_time: 32ms
 
   - platform: template
     name: "flame_up"
     id: flame_up
     on_press:
-      - remote_transmitter.transmit_raw:
-          transmitter_id: rf_tx
-          # Captured 2026-11-17 (same timing as Off, different ending)
-          code: [320, -630, 630, -310, 630, -310, 630, -310, 630, -310, 630, -310,
-                 630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 630, -310,
-                 630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 630, -310,
-                 630, -310, 630, -310, 320, -630, 630, -310, 630]
-          repeat:
-            times: 10
-            wait_time: 32ms
+      - if:
+          condition:
+            lambda: |-
+              if (id(flame_wait_s) > 0) return false;
+              if (millis() - id(last_flame_ms) < ${flame_gap_ms}) return false;
+              id(last_flame_ms) = millis();
+              return true;
+          then:
+            - remote_transmitter.transmit_raw:
+                transmitter_id: rf_tx
+                # Captured 2026-11-17 (same timing as Off, different ending)
+                code: [320, -630, 630, -310, 630, -310, 630, -310, 630, -310, 630, -310,
+                       630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 630, -310,
+                       630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 630, -310,
+                       630, -310, 630, -310, 320, -630, 630, -310, 630]
+                repeat:
+                  times: 10
+                  wait_time: 32ms
 
   - platform: template
     name: "flame_down"
     id: flame_down
     on_press:
-      - remote_transmitter.transmit_raw:
-          transmitter_id: rf_tx
-          # Captured 2026-11-17
-          code: [320, -630, 630, -310, 630, -310, 630, -310, 630, -310, 630, -310,
-                 630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 630, -310,
-                 630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 320, -630,
-                 320, -630, 320, -630, 320, -630, 320, -630, 320]
-          repeat:
-            times: 10
-            wait_time: 32ms
+      - if:
+          condition:
+            lambda: |-
+              if (id(flame_wait_s) > 0) return false;
+              if (millis() - id(last_flame_ms) < ${flame_gap_ms}) return false;
+              id(last_flame_ms) = millis();
+              return true;
+          then:
+            - remote_transmitter.transmit_raw:
+                transmitter_id: rf_tx
+                # Captured 2026-11-17
+                code: [320, -630, 630, -310, 630, -310, 630, -310, 630, -310, 630, -310,
+                       630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 630, -310,
+                       630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 320, -630,
+                       320, -630, 320, -630, 320, -630, 320, -630, 320]
+                repeat:
+                  times: 10
+                  wait_time: 32ms
