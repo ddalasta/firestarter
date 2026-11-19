@@ -10,7 +10,8 @@
 # ---------- Cooldown times (change here, then update the box) ----------
 substitutions:
   wait_after_on: "60"      # seconds: after Fire on, Fire on and the flame arrows rest this long
-  wait_after_off: "120"    # seconds: after Fire off, Fire on rests this long (Valor manual: 2 min)
+  wait_after_off: "90"     # seconds: after Fire off, Fire on rests this long (family chose 1:30;
+                           # a Valor GV60 manual says 2 min, so 120 is the by-the-book value)
   flame_gap_ms: "1000"     # milliseconds between Flame up / Flame down presses
 
 esphome:
@@ -93,6 +94,12 @@ globals:
     type: int
     restore_value: no
     initial_value: "${wait_after_off}"
+  # true while the wait that is counting came from a Fire off (or a restart).
+  # A second Fire off during that wait must not start it over.
+  - id: off_wait
+    type: bool
+    restore_value: no
+    initial_value: "true"
   - id: flame_wait_s
     type: int
     restore_value: no
@@ -178,9 +185,11 @@ button:
     name: "fire_off"
     id: fire_off
     on_press:
-      # Never refused. Starts the wait before the fire may be lit again.
+      # Never refused. Starts the wait before the fire may be lit again, unless
+      # that same after-off wait is already counting (then it is left alone).
       - lambda: |-
-          id(on_wait_s) = ${wait_after_off};
+          if (!(id(off_wait) && id(on_wait_s) > 0)) id(on_wait_s) = ${wait_after_off};
+          id(off_wait) = true;
           id(flame_wait_s) = 0;
       - number.set:
           id: safety_minutes_left
@@ -213,6 +222,7 @@ button:
           else:
             - lambda: |-
                 id(on_wait_s) = ${wait_after_on};
+                id(off_wait) = false;
                 id(flame_wait_s) = ${wait_after_on};
             - number.set:
                 id: safety_minutes_left
