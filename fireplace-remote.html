@@ -80,6 +80,11 @@
   .fireswitch button:first-child { border-radius: 16px 5px 5px 16px; }
   .fireswitch button:last-child { border-radius: 5px 16px 16px 5px; }
   .fireswitch button.on { z-index: 1; }
+  /* fire off: the "Fire on" half is a lighter grey (not the same as the Off half). Orange only while the fire is on. */
+  .fireswitch button.fire:not(.on) { background: #55555e; color: var(--text); border-color: var(--line); }
+  /* sleep timer counting: only the countdown and Cancel show */
+  .sleeping #sleepBtns, .sleeping #sleepCustom, .sleeping .note { display: none; }
+  #tabFire section.compact.sleeping .sleeprow { margin-top: 0; }
   /* flame row: small flame-down button, the drag bar, small flame-up button */
   .flamerow { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
   .fbtn { flex: none; width: 46px; height: 46px; padding: 0; border-radius: 50%; font-size: 17px; }
@@ -142,8 +147,7 @@
   }
 
   /* wheel + dimmer */
-  .colorbox { display: grid; grid-template-columns: 1fr 64px; gap: 16px; align-items: stretch; }
-  .wheelwrap { position: relative; width: 100%; max-width: 300px; justify-self: center; }
+  .wheelwrap { position: relative; width: 100%; max-width: 180px; margin: 0 auto 14px; }
   .wheelwrap::after { content: ""; display: block; padding-top: 100%; }
   #wheel { position: absolute; inset: 0; border-radius: 50%; touch-action: pan-y; cursor: crosshair; -webkit-touch-callout: none;
     background:
@@ -154,12 +158,36 @@
   #dot { position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%;
     border: 4px solid #fff; box-shadow: 0 0 0 2px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.6); pointer-events: none; }
 
-  .dimcol { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-  .dimcol small { color: var(--muted); font-size: 15px; }
-  #dimmer { position: relative; flex: 1; width: 52px; min-height: 200px; border-radius: 14px; touch-action: pan-y; cursor: ns-resize; -webkit-touch-callout: none;
-    background: linear-gradient(180deg, #fff, #222); box-shadow: 0 0 0 2px var(--line); }
-  #dimHandle { position: absolute; left: -6px; right: -6px; height: 12px; margin-top: -6px; border-radius: 6px;
+  /* dimmer: a sideways bar, dark to bright, with the same little line as the flame bar */
+  .dimrow { display: flex; align-items: center; gap: 12px; }
+  #dimmer { position: relative; flex: 1; min-width: 0; height: 34px; border-radius: 12px; touch-action: pan-y; cursor: ew-resize; -webkit-touch-callout: none;
+    background: linear-gradient(90deg, #1b1b1e, #6a6a70 45%, #fff); box-shadow: 0 0 0 2px var(--line); }
+  #dimHandle { position: absolute; top: -6px; bottom: -6px; width: 12px; margin-left: -6px; border-radius: 6px;
     background: #fff; border: 2px solid rgba(0,0,0,.6); box-shadow: 0 2px 6px rgba(0,0,0,.6); pointer-events: none; }
+  /* the percent sits in whichever half the line is not in */
+  #brightVal { position: absolute; top: 0; bottom: 0; left: 14px; display: flex; align-items: center; font-size: 15px; font-weight: 600;
+    font-variant-numeric: tabular-nums; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.85); pointer-events: none; }
+  #brightVal.tr { left: auto; right: 14px; color: #1a120c; text-shadow: none; }
+
+  /* lights: the two pickers stacked on the left, a wall switch on the right */
+  .lighttop { display: flex; gap: 12px; align-items: stretch; margin-bottom: 14px; }
+  .lighttop .pickrow { flex: 1; min-width: 0; grid-template-columns: 1fr; gap: 6px; margin-bottom: 0; }
+  /* the wall switch: a plate with two screws and a flat paddle that lights up when the lights are on */
+  .wallsw { flex: none; width: 78px; padding: 0; border-radius: 12px; border-color: #4b4b53;
+    background: linear-gradient(180deg, #3d3d44, #2b2b30); }
+  .wallsw .screw { position: absolute; left: 50%; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%;
+    background: linear-gradient(135deg, #17171a 45%, #3a3a40 46% 54%, #17171a 55%); }
+  .wallsw .screw.t { top: 7px; } .wallsw .screw.b { bottom: 7px; }
+  .wallsw .paddle { position: absolute; left: 20px; right: 20px; top: 21px; bottom: 21px; border-radius: 7px; overflow: hidden;
+    border: 2px solid #101012; display: flex; flex-direction: column; z-index: 1; transition: box-shadow .2s, border-color .2s; }
+  .wallsw .paddle i { flex: 1; display: block; }
+  .wallsw .paddle i:first-child { background: linear-gradient(180deg, #6a6a73, #55555d); }   /* off: top stands out */
+  .wallsw .paddle i:last-child { background: linear-gradient(180deg, #2c2c31, #38383e); }    /* off: bottom pressed in */
+  .wallsw.lit .paddle { border-color: #6b4a1c; box-shadow: 0 0 6px 0 var(--glow), 0 0 18px 5px var(--glow-soft); }
+  .wallsw.lit .paddle i:first-child { background: linear-gradient(180deg, #ffd9a8, #fff1dc); }
+  .wallsw.lit .paddle i:last-child { background: linear-gradient(180deg, #ffe9c9, #ffc985); }
+  /* the holiday button: a wide strip under the color buttons, only there during its dates */
+  .sw.holiday { grid-column: 1 / -1; }
 
   .row { margin: 20px 0 4px; }
   .row label { display: flex; justify-content: space-between; font-size: 16px; color: var(--muted); margin-bottom: 8px; }
@@ -199,11 +227,12 @@
   /* "pick a room first": light controls fade until a room is chosen */
   .roomhint { display: none; text-align: center; margin: -4px 0 12px; }
   .noroom .roomhint { display: block; }
-  .noroom .powerrow, .noroom .swatches, .noroom .colorbox, .noroom .row { opacity: .3; transition: opacity .3s; }
+  .noroom .wallsw, .noroom .swatches, .noroom .wheelwrap, .noroom .dimrow { opacity: .3; transition: opacity .3s; }
   .pickrow select.need { animation: needpulse .9s ease-in-out 2; }
   @keyframes needpulse { 50% { box-shadow: 0 4px 0 rgba(0,0,0,.75), 0 0 10px 3px var(--glow), 0 0 26px 8px var(--glow-soft); } }
   /* wheel / dimmer "grabbed" after press-and-hold */
   #wheel.grab, #dimmer.grab { box-shadow: 0 0 0 3px var(--glow), 0 0 24px 8px var(--glow-soft); }
+  #dimmer.grab #dimHandle { transition: none; }
 
   /* Go Sounders! celebration */
   #celebrate { position: fixed; inset: 0; pointer-events: none; z-index: 50; overflow: hidden; display: none; }
@@ -221,7 +250,45 @@
   #celebrate .cf { position: absolute; top: -20px; width: 10px; height: 16px; border-radius: 2px; opacity: .95;
     animation: cffall var(--t, 2.4s) linear var(--d, 0s) forwards; }
   @keyframes cffall { to { transform: translate(var(--x, 0), 110vh) rotate(var(--r, 540deg)); opacity: .9; } }
-  @media (prefers-reduced-motion: reduce) { #celebrate .cf { display: none; } #celebrate .gs { animation: none; } }
+  /* pop-up drawings for Sounders and the holidays (see POP_ART) */
+  #celebrate svg { display: block; width: 100%; height: auto; overflow: visible; }
+  #celebrate .badge { position: absolute; left: 50%; top: 26%; width: min(56vw, 240px); margin-left: calc(min(56vw, 240px) / -2);
+    filter: drop-shadow(0 6px 16px rgba(0,0,0,.8)); animation: gspop 3.2s ease-out forwards; }
+  #celebrate .badge text { font-family: inherit; }
+  #celebrate .fl { position: absolute; width: var(--z, 40px); opacity: 0; animation: flup var(--t, 3s) linear var(--d, 0s) forwards; }
+  #celebrate .fl.up { bottom: -70px; }
+  #celebrate .fl.down { top: -70px; animation-name: fldown; }
+  @keyframes flup { 0% { transform: translate(0, 0) rotate(calc(var(--r) * -1)); opacity: 0; } 10% { opacity: 1; }
+    50% { transform: translate(var(--x), -58vh) rotate(var(--r)); } 90% { opacity: 1; }
+    100% { transform: translate(0, -118vh) rotate(calc(var(--r) * -1)); opacity: 0; } }
+  @keyframes fldown { 0% { transform: translate(0, 0) rotate(0deg); opacity: 0; } 10% { opacity: 1; }
+    100% { transform: translate(var(--x), 118vh) rotate(var(--r)); opacity: .9; } }
+  #celebrate .turkey { position: absolute; bottom: 15%; left: 0; width: min(40vw, 180px); animation: turkeywalk 3.8s linear forwards; }
+  #celebrate .turkey svg { animation: turkeybob .34s ease-in-out infinite alternate; }
+  @keyframes turkeywalk { from { transform: translateX(-45vw); } to { transform: translateX(105vw); } }
+  @keyframes turkeybob { to { transform: translateY(-7px) rotate(-3deg); } }
+  #celebrate .tree { position: absolute; left: 50%; bottom: 13%; width: min(46vw, 200px); margin-left: calc(min(46vw, 200px) / -2);
+    transform-origin: 50% 100%; animation: treeup 4s ease-out forwards; }
+  @keyframes treeup { 0% { transform: scale(0); opacity: 0; } 12% { transform: scale(1.08); opacity: 1; } 18% { transform: scale(1); }
+    86% { opacity: 1; } 100% { opacity: 0; } }
+  #celebrate .orn { animation: twinkle .6s ease-in-out infinite alternate; }
+  #celebrate .orn:nth-of-type(even) { animation-delay: .3s; }
+  @keyframes twinkle { from { opacity: .2; } to { opacity: 1; } }
+  #celebrate .santa { position: absolute; top: 11%; left: 0; width: min(58vw, 260px); animation: sleigh 3.5s ease-in-out .3s both; }
+  @keyframes sleigh { 0% { transform: translate(-75vw, 44px) rotate(-8deg); } 50% { transform: translate(22vw, -14px) rotate(-3deg); }
+    100% { transform: translate(115vw, 30px) rotate(6deg); } }
+  #celebrate .pole { position: absolute; left: 50%; top: 0; width: 6px; height: 44vh; margin-left: -3px; border-radius: 3px;
+    background: linear-gradient(#55555d, #9a9aa3); }
+  #celebrate .ball { position: absolute; left: 50%; top: 0; width: min(26vw, 110px); margin-left: calc(min(26vw, 110px) / -2);
+    animation: balldrop 2s cubic-bezier(.5, 0, .75, 1) both, ballglow .45s ease-in-out 2s 5 alternate; }
+  @keyframes balldrop { from { transform: translateY(-22vh); } to { transform: translateY(36vh); } }
+  @keyframes ballglow { to { filter: drop-shadow(0 0 20px #ffe27a) brightness(1.35); } }
+  #celebrate.pop-newyear .gs { top: 60%; animation-delay: 1.9s; animation-fill-mode: both; }
+  #celebrate .boom { position: absolute; width: var(--z, 150px); margin: calc(var(--z, 150px) / -2) 0 0 calc(var(--z, 150px) / -2);
+    animation: boom 1.2s ease-out var(--d, 0s) both; }
+  @keyframes boom { 0% { transform: scale(.05); opacity: 0; } 15% { opacity: 1; } 65% { opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { #celebrate .cf, #celebrate .fl, #celebrate .boom { display: none; }
+    #celebrate .gs, #celebrate .badge, #celebrate .turkey, #celebrate .santa, #celebrate .ball { animation: none; } }
 
   /* ---------- screen saver ---------- */
   /* "Light the fire?" card: our own question, instead of the phone's plain pop-up */
@@ -269,16 +336,40 @@
   .tokrow input { flex: 1; min-width: 0; font: inherit; font-size: 16px; color: var(--text); background: var(--panel-2);
     border: 2px solid var(--line); border-radius: 12px; padding: 8px 10px; }
   .tokrow button { padding: 8px 16px; font-size: 16px; }
-  .foot { text-align: center; margin: 4px 0 70px; }
-  .ver { display: block; color: var(--muted); font-size: 12px; opacity: .7; margin-top: 2px; }
+  .ver { display: block; color: var(--muted); font-size: 13px; }
+  /* the gear in the top corner, and its little card */
+  h1 { display: flex; align-items: center; }
+  .gearbtn { margin-left: auto; width: 38px; height: 38px; padding: 0; border-radius: 50%; color: var(--muted);
+    display: grid; place-items: center; }
+  .gearbtn .ico { width: 19px; height: 19px; vertical-align: 0; }
+  #gear { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.55); display: flex; align-items: flex-start;
+    justify-content: flex-end; padding: calc(max(env(safe-area-inset-top, 0px), 34px) + 46px) 16px 0; }
+  #gear.hidden { display: none; }
+  .gearcard { width: 230px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 14px;
+    display: flex; flex-direction: column; gap: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.7); font-size: 17px; }
+  .gearcard button { padding: 12px 10px; font-size: 16px; }
   button.link { background: none; border: 0; box-shadow: none; color: var(--muted); font-size: 13px; padding: 6px; }
   button.link::after { display: none; }
 
   /* ===== FIRE SCENE (shows while the fire is on) ===== */
-  .firescene { height: 0; opacity: 0; overflow: hidden; border-radius: 14px;
-    background: radial-gradient(ellipse at 50% 100%, #2a1206 0%, #120a05 60%, #0b0806 100%);
-    transition: height .6s ease, opacity .6s ease, margin .6s ease; }
-  .firescene.show { height: 119px; opacity: 1; margin-bottom: 12px; }
+  .firescene { height: 119px; margin-bottom: 12px; overflow: hidden; border-radius: 14px;
+    background: radial-gradient(ellipse at 50% 100%, #2a1206 0%, #120a05 60%, #0b0806 100%); }
+  /* fire off: just the cold logs. The flames, the glow and the sparks come with "show". */
+  .firescene #flameWrap, .firescene .glowwrap, .firescene .hearth { transition: opacity .8s ease; }
+  .firescene:not(.show) #flameWrap, .firescene:not(.show) .glowwrap, .firescene:not(.show) .hearth { opacity: 0; }
+  .firescene:not(.show) .ember { visibility: hidden; }
+  /* fire off: thin wisps of steam drift up off the logs. Cooling down after Fire off: coals glow under them. */
+  .steam, .coals { opacity: 0; transition: opacity 1.2s ease; }
+  .firescene:not(.show) .steam { opacity: 1; }
+  .firescene.cooling:not(.show) .coals { opacity: 1; }
+  .steam path { fill: none; stroke: #b9b9c4; stroke-width: 2.2; stroke-linecap: round; opacity: 0; animation: steamup 4.5s ease-in-out infinite; }
+  .steam .s2 { animation-delay: 1.5s; }
+  .steam .s3 { animation-delay: 3s; }
+  @keyframes steamup { 0% { transform: translateY(6px); opacity: 0; } 25% { opacity: .32; } 100% { transform: translateY(-24px); opacity: 0; } }
+  .coals circle { animation: coalglow 1.5s ease-in-out infinite alternate; }
+  .coals circle:nth-of-type(even) { animation-delay: .7s; }
+  @keyframes coalglow { from { opacity: .5; } to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .steam path { animation: none; opacity: .25; } .coals circle { animation: none; } }
   .firescene svg { width: 100%; height: 100%; display: block; }
   .fx { transform-box: fill-box; transform-origin: 50% 100%; }
   .f1 { animation: flicker 1.3s ease-in-out infinite; }
@@ -411,7 +502,7 @@
   #tabFire h2 { margin-bottom: calc(6px + 6 * var(--s)); }
   #tabFire section.compact h2 { margin-bottom: calc(4px + 4 * var(--s)); }
   #tabFire button.scene { padding: calc(13px + 9 * var(--s)) 10px; }
-  #tabFire .firescene.show { height: calc(64px + 55 * var(--s)); margin-bottom: calc(8px + 4 * var(--s)); }
+  #tabFire .firescene { height: calc(64px + 55 * var(--s)); margin-bottom: calc(8px + 4 * var(--s)); }
   #tabFire .fireswitch button { padding: calc(12px + 6 * var(--s)) 10px; }
   #tabFire .flamerow { margin-top: calc(8px + 6 * var(--s)); }
   #tabFire .fbtn { width: calc(40px + 6 * var(--s)); height: calc(40px + 6 * var(--s)); }
@@ -423,18 +514,12 @@
   @media (max-height: 907px) { #tabFire section.compact .note { display: none; } }
   /* Lights tab: the same idea. The color wheel and the dimmer shrink the most. */
   #tabLights section { padding: calc(10px + 6 * var(--s)); }
-  #tabLights .pickrow { margin-bottom: calc(6px + 6 * var(--s)); }
+  #tabLights .lighttop { margin-bottom: calc(8px + 6 * var(--s)); }
   #tabLights .pickrow select { font-size: 16px; padding-top: calc(7px + 3 * var(--s)); padding-bottom: calc(7px + 3 * var(--s)); }
-  #tabLights .powerrow { margin-bottom: calc(6px + 6 * var(--s)); }
-  #tabLights .powerrow button { font-size: 17px; padding: calc(9px + 4 * var(--s)) 10px; }
   #tabLights .swatches { gap: calc(7px + 2 * var(--s)); margin-bottom: calc(8px + 6 * var(--s)); }
   #tabLights .sw { height: calc(36px + 8 * var(--s)); font-size: 14px; border-radius: 14px; }
-  #tabLights .wheelwrap { max-width: calc(150px + 70 * var(--s)); }
-  #dimmer { width: 46px; min-height: calc(96px + 54 * var(--s)); }
-  #tabLights .colorbox { grid-template-columns: 1fr 58px; }
-  #tabLights .row { margin-top: calc(6px + 8 * var(--s)); }
-  #tabLights .row label { font-size: 15px; margin-bottom: calc(5px + 3 * var(--s)); }
-  #kelvin { height: 30px; }
+  #tabLights .wheelwrap { max-width: calc(140px + 40 * var(--s)); margin-bottom: calc(8px + 6 * var(--s)); }
+  #tabLights .fbtn { width: calc(38px + 6 * var(--s)); height: calc(38px + 6 * var(--s)); }
   /* Used for a split second while the page measures itself (see fitScreen): the
      Fireplace tab is measured as if the fire picture and the Safety line were
      showing, so nothing jumps when the fire is turned on. */
@@ -497,7 +582,17 @@
   </defs>
 </svg>
 
-<h1 id="title"><svg class="ico big"><use id="titleIco" href="#i-flame-face"/></svg><span id="titleText">Fireplace</span></h1>
+<h1 id="title"><svg class="ico big"><use id="titleIco" href="#i-flame-face"/></svg><span id="titleText">Fireplace</span>
+  <button class="gearbtn" id="gearBtn" aria-label="Settings"><svg class="ico" viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.500" fill="none" stroke="currentColor" stroke-width="3.200" stroke-dasharray="3.200 2.900"/><circle cx="10" cy="10" r="3.600" fill="none" stroke="currentColor" stroke-width="2"/></svg></button></h1>
+<!-- the gear's little card: the version and the LIFX token -->
+<div id="gear" class="hidden">
+  <div class="gearcard">
+    <b>Settings</b>
+    <span class="ver" id="ver"></span>
+    <button id="tokenChange">LIFX token&hellip;</button>
+    <button class="off" id="gearClose">Close</button>
+  </div>
+</div>
 
 <div class="tab" id="tabFire">
 <section>
@@ -542,6 +637,16 @@
       <g class="log l2"><g transform="rotate(9 100 90)"><rect x="58" y="84" width="84" height="11" rx="5.5" fill="#7a4924"/>
         <ellipse cx="61" cy="89.5" rx="4" ry="5.5" fill="#a8703f"/><ellipse cx="61" cy="89.5" rx="2" ry="3" fill="#c48c55"/></g></g>
       <ellipse class="hearth" cx="100" cy="94" rx="30" ry="3" fill="#ff7a2f"/>
+      <!-- hot coals: only while the box is cooling down after Fire off -->
+      <g class="coals">
+        <ellipse cx="100" cy="93.500" rx="27" ry="3.500" fill="#ff5a1f" opacity=".45"/>
+        <circle cx="85" cy="92.500" r="3" fill="#ff7a2f"/><circle cx="95" cy="93.500" r="3.400" fill="#ffb347"/>
+        <circle cx="106" cy="92.500" r="3" fill="#ff5a1f"/><circle cx="116" cy="93.500" r="2.600" fill="#ff7a2f"/>
+      </g>
+      <!-- a little steam off the cold logs while the fire is off -->
+      <g class="steam">
+        <path class="s1" d="M88 80q-5-7 0-13t0-13"/><path class="s2" d="M102 78q5-7 0-13t0-13"/><path class="s3" d="M115 81q-4-6 0-12t0-11"/>
+      </g>
       <!-- matchbox + match: only seen while the fire is lighting -->
       <g class="matchkit">
         <g class="mbox">
@@ -614,33 +719,30 @@
       <button id="tokenSave">Save</button>
     </div>
   </div>
-  <div class="pickrow">
-    <label><span>Room</span><select id="roomSel"></select></label>
-    <label><span>Light</span><select id="bulbSel"></select></label>
+  <!-- pickers stacked on the left, a wall switch for the lights on the right -->
+  <div class="lighttop">
+    <div class="pickrow">
+      <label><span>Room</span><select id="roomSel"></select></label>
+      <label><span>Light</span><select id="bulbSel"></select></label>
+    </div>
+    <button class="wallsw" id="lswitch" aria-label="Lights on or off" aria-pressed="false">
+      <span class="screw t"></span><span class="paddle"><i></i><i></i></span><span class="screw b"></span>
+    </button>
   </div>
   <p class="note roomhint" id="roomHint">Pick a room above to change the lights.</p>
 
-  <div class="powerrow">
-    <button id="lon">On</button>
-    <button class="off" id="loff">Off</button>
-  </div>
-
+  <!-- color buttons (the holiday one is added here only during its dates) -->
   <div class="swatches" id="presets"></div>
 
-  <div class="colorbox">
-    <div class="wheelwrap">
-      <div id="wheel"><div id="dot"></div></div>
-    </div>
-    <div class="dimcol">
-      <svg class="ico" id="sunIcon" style="width:26px;height:26px"><use href="#i-sun"/></svg>
-      <div id="dimmer"><div id="dimHandle"></div></div>
-      <small id="brightVal"></small>
-    </div>
+  <div class="wheelwrap">
+    <div id="wheel"><div id="dot"></div></div>
   </div>
 
-  <div class="row">
-    <label><span>Warm ↔ Cool white</span><span id="kelvinVal"></span></label>
-    <div id="kelvin"><div id="kelvinHandle"></div></div>
+  <!-- dimmer: press and hold, then drag the little line. The suns nudge it. -->
+  <div class="dimrow">
+    <button class="fbtn" id="dimDown" aria-label="Dimmer"><svg class="ico" style="width:15px;height:15px;opacity:.7"><use href="#i-sun"/></svg></button>
+    <div id="dimmer"><span id="brightVal"></span><div id="dimHandle"></div></div>
+    <button class="fbtn" id="dimUp" aria-label="Brighter"><svg class="ico" style="width:25px;height:25px"><use href="#i-sun"/></svg></button>
   </div>
 </section>
 </div>
@@ -651,8 +753,6 @@
 
 
 
-<p class="foot"><button class="link" id="tokenChange">LIFX token&hellip;</button>
-  <span class="ver" id="ver"></span></p>
 
 <nav class="tabbar" id="tabbar">
   <button class="tabbtn sel" data-tab="tabFire" aria-label="Fireplace">
@@ -706,7 +806,7 @@ var FIRE_ROOM = "Living Room";
 // Rooms to show if the LIFX list can't load
 var FALLBACK_ROOMS = ["Living Room", "Master bedroom", "Kids", "Office", "Garage"];
 // Bumped every time the page is changed, so you can tell when the phone has the new one.
-var APP_VERSION = "3.7";
+var APP_VERSION = "3.8";
 // ====================================================
 
 var LIFX = "https://api.lifx.com/v1";
@@ -763,9 +863,11 @@ var PRESETS = [
   { name: "Candle",  color: "kelvin:2000", bg: "#ff9a3c" },
   { name: "Warm",    color: "kelvin:2700", bg: "#ffc985" },
   { name: "Day",     color: "kelvin:4000", bg: "#fff1dc" },
-  { name: "Bright",  color: "kelvin:6500", bg: "#e4efff" },
+  // half the bulbs orange, half magenta, at half brightness (no pop-up: it has no title)
+  { name: "Sunset",  theme: { key: "sunset", lights: ["hue:28 saturation:1", "hue:308 saturation:1"], brightness: 0.5 },
+    bg: "linear-gradient(90deg, #ff7a1a 0 42%, #ff2fb4 58% 100%) border-box", fg: "#fff" },
   { name: "Movie",   color: "hue:0 saturation:1",   bg: "#ff4040" },
-  { name: THEME.name, special: "theme", bg: themeBg(THEME.css), fg: "#fff" },
+  { name: "Sounders", theme: SOUNDERS_THEME, bg: themeBg(SOUNDERS_THEME.css), fg: "#fff" },
   { name: "Blue",    color: "hue:220 saturation:1", bg: "#4d8cff" },
   { name: "Green",   color: "hue:120 saturation:1", bg: "#54e06b" }
 ];
@@ -918,8 +1020,9 @@ function markPreset(name) {
   each(".sw", function (b) { b.classList.toggle("on", b.textContent === name); });
 }
 function markPower(id) {
-  $("lon").classList.toggle("on", id === "lon");
-  $("loff").classList.toggle("on", id === "loff");
+  // the wall switch: its paddle lights up when the lights are on ("lon")
+  $("lswitch").classList.toggle("lit", id === "lon");
+  $("lswitch").setAttribute("aria-pressed", id === "lon" ? "true" : "false");
 }
 function markFire(id) {
   each('[data-fire="fire_on"], [data-fire="fire_off"]', function (b) {
@@ -995,6 +1098,8 @@ function showWaits() {
   b.textContent = on > 0 ? "Ready in " + mmss(on) : "Fire on";
   each('[data-fire="flame_up"], [data-fire="flame_down"]', function (x) { x.classList.toggle("wait", fl > 0); });
   $("flameBar").classList.toggle("wait", fl > 0);
+  // hot coals under the cold logs while Fire on is resting after a Fire off
+  $("fireScene").classList.toggle("cooling", on > 0 && !$("fireScene").classList.contains("show"));
 }
 setInterval(showWaits, 1000);
 
@@ -1077,7 +1182,8 @@ var flameGoal = -1;           // level the box is moving the flame to (-1 = it i
 var flameDrag = -1;           // level under the finger while dragging (-1 = not dragging)
 var lastGoalSet = 0, moveTimer = null;
 function levelWord(n) {
-  return n >= FLAME_STEPS ? "Full" : n <= 0 ? "Lowest" : Math.round(n / FLAME_STEPS * 100) + "%";
+  // rounded to the nearest 5 so it reads 40%, 85% (the 23 real steps would give 39%, 83%)
+  return n >= FLAME_STEPS ? "Full" : n <= 0 ? "Lowest" : Math.round(n / FLAME_STEPS * 20) * 5 + "%";
 }
 function drawFlame() {
   var bar = $("flameBar"), live = boxHasLevel && flameOn;
@@ -1128,8 +1234,8 @@ function flash(b) {
 }
 // wheel vs warm/cool: whichever you used last looks "active", the other fades
 function markMode(mode) {
+  // the wheel fades a little while the lights are on a plain white
   $("wheel").classList.toggle("dim", mode === "white");
-  $("kelvin").classList.toggle("dim", mode === "color");
 }
 
 // ---------- room & light dropdowns ----------
@@ -1175,7 +1281,8 @@ function pick(sel) {
   selector = sel;
   if (sel && $("bulbSel").querySelector('option[value="' + sel + '"]')) $("bulbSel").value = sel;
   lightsSection.classList.toggle("noroom", !sel);
-  if (sel) usedLights();
+  if (!sel) markPower(null);
+  if (sel) { usedLights(); showRealLights(); }
 }
 
 // ---------- "pick a room first" safety ----------
@@ -1231,29 +1338,63 @@ function loadLights() {
 }
 
 // ---------- on / off ----------
-$("lon").addEventListener("click", function () {
+// One wall switch: tap it to flip the lights.
+$("lswitch").addEventListener("click", function () {
   if (needRoom()) return;
-  markScene(null); markPower("lon");
-  setState({ power: "on", duration: 0.5 }).then(sayIf("Lights on"));
-});
-$("loff").addEventListener("click", function () {
-  if (needRoom()) return;
-  markScene(null); markPower("loff");
-  setState({ power: "off", duration: 0.5 }).then(sayIf("Lights off"));
+  var on = !this.classList.contains("lit");
+  markScene(null); markPower(on ? "lon" : "loff");
+  setState({ power: on ? "on" : "off", duration: 0.5 }).then(sayIf(on ? "Lights on" : "Lights off"));
 });
 
+// ---------- what the lights are really doing ----------
+// When a room or light is picked (or the Lights tab is opened), ask LIFX how
+// those lights are set right now, so the switch, the dimmer and the color dot
+// start from the truth instead of a guess.
+function showRealLights() {
+  if (!selector || !lifxReady) return;
+  var sel = selector;
+  lifx("GET", "/lights/" + encodeURIComponent(sel)).then(function (list) {
+    if (sel !== selector || !list || !list.length) return;      // picked something else meanwhile
+    var live = list.filter(function (l) { return l.connected !== false; });
+    if (!live.length) return;
+    var lit = live.filter(function (l) { return l.power === "on"; });
+    markPower(lit.length ? "lon" : "loff");
+    var ref = lit[0] || live[0];
+    if (typeof ref.brightness === "number") placeDim(Math.max(1, Math.round(ref.brightness * 100)));
+    if (ref.color) {
+      if (ref.color.saturation > 0.05) {
+        markMode("color"); placeDot(Math.round(ref.color.hue), Math.round(ref.color.saturation * 100) / 100);
+      } else { markMode("white"); placeDot(30, 0); }
+    }
+    markPreset(null);
+  }).catch(function () {});
+}
+
 // ---------- presets ----------
+// The holiday button is its own wide button, added only during a holiday's dates.
+if (THEME !== SOUNDERS_THEME) PRESETS.push({ name: THEME.name, theme: THEME, bg: themeBg(THEME.css), fg: "#fff", holiday: true });
 PRESETS.forEach(function (p) {
   var b = document.createElement("button");
-  b.className = "sw"; b.textContent = p.name; b.style.background = p.bg;
+  b.className = "sw" + (p.holiday ? " holiday" : ""); b.textContent = p.name; b.style.background = p.bg;
   if (p.fg) { b.style.color = p.fg; b.style.textShadow = "0 1px 2px rgba(0,0,0,.6)"; }
   b.addEventListener("click", function () {
     if (needRoom()) return;
+    // a dimmer or wheel change still waiting to be sent must not land on top of this button
+    clearTimeout(timer); timer = null; pending = null;
     markScene(null); markPreset(p.name); markPower("lon");
-    if (p.special === "theme") { markMode("color"); themeLights(THEME).then(function (ok) { if (ok) celebrate(THEME); }); return; }
+    if (p.theme) {
+      // several colors shared out between the bulbs (Sunset, Sounders, the holidays)
+      markMode("color");
+      themeLights(p.theme).then(function (ok) {
+        if (!ok) return;
+        if (p.theme.brightness) placeDim(Math.round(p.theme.brightness * 100));
+        if (p.theme.title) celebrate(p.theme); else say(p.name);
+      });
+      return;
+    }
     var m;
     if ((m = /^kelvin:(\d+)/.exec(p.color))) {
-      markMode("white"); placeKelvin(+m[1]);
+      markMode("white"); placeDot(30, 0);
     } else if ((m = /^hue:(\d+)/.exec(p.color))) {
       markMode("color"); placeDot(+m[1], 1);
     }
@@ -1271,46 +1412,142 @@ function bulbsIn(sel) {
     return false;
   });
 }
-function celebrate(t) {
-  var c = $("celebrate");
-  c.innerHTML = '<div class="gs">' + t.title + '<small>' + t.sub + '</small></div>';
-  c.firstChild.style.background = "linear-gradient(90deg, " + t.css.join(", ") + ")";
-  c.firstChild.style.webkitBackgroundClip = "text";
-  c.firstChild.style.backgroundClip = "text";
-  var colors = t.css.concat(["#ffffff"]);
-  for (var i = 0; i < 46; i++) {
+// ---------- pop-ups for Sounders and the holidays ----------
+// Little flat drawings in the same style as the fire picture. They play over
+// the page for a few seconds and never block a tap.
+var POP_ART = {
+  // our own badge (not the club's crest): a green and blue shield
+  badge: '<svg viewBox="0 0 120 140"><path d="M60 4L112 20V70C112 104 90 126 60 136C30 126 8 104 8 70V20Z" fill="#5d9732"/>' +
+    '<path d="M60 14L103 27V70C103 98 85 116 60 125C35 116 17 98 17 70V27Z" fill="#236192"/>' +
+    '<circle cx="60" cy="43" r="15" fill="#fff"/><path d="M60 35L67.600 40.500L64.700 49.500H55.300L52.400 40.500Z" fill="#236192"/>' +
+    '<text x="60" y="78" text-anchor="middle" font-size="17" font-weight="700" fill="#fff">GO</text>' +
+    '<text x="60" y="96" text-anchor="middle" font-size="13" font-weight="700" fill="#fff" textLength="66" lengthAdjust="spacingAndGlyphs">SOUNDERS</text></svg>',
+  turkey: '<svg viewBox="0 0 120 100"><g transform="translate(58 66)">' +
+    '<ellipse rx="9" ry="30" cy="-28" fill="#b8401f" transform="rotate(-62)"/><ellipse rx="9" ry="31" cy="-29" fill="#e8731c" transform="rotate(-31)"/>' +
+    '<ellipse rx="9" ry="32" cy="-30" fill="#e9b234"/><ellipse rx="9" ry="31" cy="-29" fill="#e8731c" transform="rotate(31)"/>' +
+    '<ellipse rx="9" ry="30" cy="-28" fill="#b8401f" transform="rotate(62)"/></g>' +
+    '<path d="M54 87v9M66 87v9M50 96h8M62 96h8" stroke="#e9b234" stroke-width="2.500" stroke-linecap="round" fill="none"/>' +
+    '<ellipse cx="60" cy="68" rx="22" ry="20" fill="#7a4924"/><ellipse cx="53" cy="70" rx="10" ry="8" fill="#6b3f1f"/>' +
+    '<path d="M72 60Q78 54 80 48" stroke="#8a5630" stroke-width="9" stroke-linecap="round" fill="none"/><circle cx="81" cy="44" r="9" fill="#8a5630"/>' +
+    '<path d="M89 42l9 3-9 3z" fill="#e9b234"/><path d="M87 48q3 7-1 11q-3-6 1-11z" fill="#d93d3d"/><circle cx="83" cy="42" r="1.800" fill="#111"/></svg>',
+  tree: '<svg viewBox="0 0 100 130"><rect x="44" y="108" width="12" height="16" rx="2" fill="#6b3f1f"/>' +
+    '<path d="M50 14L74 50H26Z" fill="#23a841"/><path d="M50 36L82 80H18Z" fill="#1f9e3a"/><path d="M50 62L90 112H10Z" fill="#1b8a33"/>' +
+    '<path d="M50 1L53.200 9.600L62.400 10L55.200 15.700L57.600 24.600L50 19.500L42.400 24.600L44.800 15.700L37.600 10L46.800 9.600Z" fill="#ffd27a"/>' +
+    '<circle class="orn" cx="44" cy="42" r="3.500" fill="#ff4040"/><circle class="orn" cx="57" cy="44" r="3.500" fill="#ffd27a"/>' +
+    '<circle class="orn" cx="38" cy="70" r="3.500" fill="#4d8cff"/><circle class="orn" cx="52" cy="66" r="3.500" fill="#ff4040"/>' +
+    '<circle class="orn" cx="65" cy="72" r="3.500" fill="#ffd27a"/><circle class="orn" cx="30" cy="100" r="3.500" fill="#ffd27a"/>' +
+    '<circle class="orn" cx="48" cy="94" r="3.500" fill="#4d8cff"/><circle class="orn" cx="66" cy="100" r="3.500" fill="#ff4040"/></svg>',
+  santa: '<svg viewBox="0 0 200 70"><path d="M92 36L140 30" stroke="#c9a24a" stroke-width="1.500" fill="none"/>' +
+    '<path d="M142 40l-4 12M148 41l-1 12M157 41l3 12M163 39l6 11" stroke="#6b3f1f" stroke-width="3" stroke-linecap="round" fill="none"/>' +
+    '<ellipse cx="152" cy="34" rx="15" ry="8" fill="#8a5630"/><circle cx="170" cy="24" r="6.500" fill="#8a5630"/><circle cx="177" cy="25" r="2.600" fill="#ff3b30"/>' +
+    '<path d="M168 18l-3-9M165 12l-5-2M171 18l3-9M173 12l5-2" stroke="#6b3f1f" stroke-width="2" stroke-linecap="round" fill="none"/>' +
+    '<circle cx="40" cy="28" r="10" fill="#7a4924"/><circle cx="62" cy="30" r="11" fill="#d8262f"/><circle cx="62" cy="18" r="7" fill="#ffd9b8"/>' +
+    '<path d="M55 20q7 13 14 0q-2 9-7 9t-7-9z" fill="#fff"/><path d="M55 15q7-12 15-2z" fill="#d8262f"/><circle cx="71" cy="12" r="2.500" fill="#fff"/>' +
+    '<path d="M30 30h14v12h40V28h10v22q0 6-6 6H38q-8 0-8-8z" fill="#d8262f"/>' +
+    '<path d="M26 62h62q8 0 10-8M42 56v6M78 56v6" stroke="#e9b234" stroke-width="3" fill="none" stroke-linecap="round"/></svg>',
+  ball: '<svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="36" fill="#f2c14e"/><g stroke="#fff" stroke-width="2" opacity=".7" fill="none">' +
+    '<ellipse cx="40" cy="40" rx="36" ry="13"/><ellipse cx="40" cy="40" rx="13" ry="36"/><path d="M4 40h72M40 4v72"/></g>' +
+    '<circle cx="28" cy="27" r="7" fill="#fff" opacity=".8"/></svg>',
+  heart: '<svg viewBox="0 0 32 30"><path d="M16 28C4 19 1 13 1 8.500C1 4 4.500 1 8.500 1C12 1 14.500 3 16 5.500C17.500 3 20 1 23.500 1C27.500 1 31 4 31 8.500C31 13 28 19 16 28Z" fill="currentColor"/></svg>',
+  shamrock: '<svg viewBox="0 0 40 44"><g fill="currentColor"><circle cx="20" cy="11" r="9"/><circle cx="10" cy="24" r="9"/><circle cx="30" cy="24" r="9"/><path d="M18 24h4l2 18h-5z"/></g></svg>',
+  ghost: '<svg viewBox="0 0 40 48"><path d="M4 22C4 10 11 3 20 3s16 7 16 19v23l-5.300-5-5.300 5-5.400-5-5.400 5-5.300-5L4 45Z" fill="#f4f4f6"/>' +
+    '<ellipse cx="14" cy="21" rx="3" ry="4.500" fill="#1b1b1e"/><ellipse cx="26" cy="21" rx="3" ry="4.500" fill="#1b1b1e"/><ellipse cx="20" cy="31" rx="3.500" ry="4.500" fill="#1b1b1e"/></svg>'
+};
+// a firework burst: 12 short lines around a middle
+POP_ART.boom = (function () {
+  var s = '<svg viewBox="-50 -50 100 100"><g stroke="currentColor" stroke-width="4" stroke-linecap="round">';
+  for (var a = 0; a < 12; a++) {
+    var x = Math.cos(a * Math.PI / 6), y = Math.sin(a * Math.PI / 6), r1 = a % 2 ? 20 : 14, r2 = a % 2 ? 36 : 46;
+    s += '<path d="M' + (x * r1).toFixed(1) + " " + (y * r1).toFixed(1) + "L" + (x * r2).toFixed(1) + " " + (y * r2).toFixed(1) + '"/>';
+  }
+  return s + "</g></svg>";
+})();
+function rnd(a, b) { return a + Math.random() * (b - a); }
+function popEl(cls, html) { var d = document.createElement("div"); d.className = cls; d.innerHTML = html || ""; return d; }
+// little paper bits falling (round = snow / sparkle)
+function confetti(c, colors, n, round, delay) {
+  for (var i = 0; i < n; i++) {
     var d = document.createElement("i");
     d.className = "cf";
     d.style.left = Math.round(Math.random() * 100) + "%";
     d.style.background = colors[i % colors.length];
-    d.style.setProperty("--x", Math.round(Math.random() * 160 - 80) + "px");
-    d.style.setProperty("--r", Math.round(Math.random() * 900 - 450) + "deg");
-    d.style.setProperty("--t", (1.8 + Math.random() * 1.4).toFixed(2) + "s");
-    d.style.setProperty("--d", (Math.random() * .5).toFixed(2) + "s");
-    if (i % 3 === 0) { d.style.width = "8px"; d.style.height = "8px"; d.style.borderRadius = "50%"; }
+    d.style.setProperty("--x", Math.round(rnd(-80, 80)) + "px");
+    d.style.setProperty("--r", Math.round(rnd(-450, 450)) + "deg");
+    d.style.setProperty("--t", rnd(1.8, 3.2).toFixed(2) + "s");
+    d.style.setProperty("--d", ((delay || 0) + rnd(0, .5)).toFixed(2) + "s");
+    if (round || i % 3 === 0) { d.style.width = "8px"; d.style.height = "8px"; d.style.borderRadius = "50%"; }
     c.appendChild(d);
+  }
+}
+// drawings drifting up (hearts, ghosts) or tumbling down (shamrocks)
+function floaters(c, art, n, dir, colors) {
+  for (var i = 0; i < n; i++) {
+    var d = popEl("fl " + dir, art);
+    d.style.left = Math.round(rnd(2, 86)) + "%";
+    if (colors) d.style.color = colors[i % colors.length];
+    d.style.setProperty("--z", Math.round(rnd(30, 62)) + "px");
+    d.style.setProperty("--x", Math.round(rnd(-60, 60)) + "px");
+    d.style.setProperty("--r", Math.round(rnd(-25, 25)) * (dir === "down" ? 12 : 1) + "deg");
+    d.style.setProperty("--t", rnd(2.4, 3.6).toFixed(2) + "s");
+    d.style.setProperty("--d", rnd(0, .9).toFixed(2) + "s");
+    c.appendChild(d);
+  }
+}
+function celebrate(t) {
+  var c = $("celebrate"), k = t.key;
+  c.innerHTML = "";
+  c.className = "pop-" + k;
+  if (k === "sounders") {
+    // our badge pops up with a little confetti
+    c.appendChild(popEl("badge", POP_ART.badge));
+    confetti(c, t.css.concat(["#ffffff"]), 22);
+  } else {
+    var g = popEl("gs", t.title + "<small>" + t.sub + "</small>");
+    g.style.background = "linear-gradient(90deg, " + t.css.join(", ") + ")";
+    g.style.webkitBackgroundClip = "text";
+    g.style.backgroundClip = "text";
+    c.appendChild(g);
+    if (k === "thanks") { c.appendChild(popEl("turkey", POP_ART.turkey)); confetti(c, t.css, 26); }
+    else if (k === "xmas") { c.appendChild(popEl("tree", POP_ART.tree)); c.appendChild(popEl("santa", POP_ART.santa)); confetti(c, ["#ffffff"], 30, true); }
+    else if (k === "newyear") { c.appendChild(popEl("pole")); c.appendChild(popEl("ball", POP_ART.ball)); confetti(c, t.css.concat(["#ffe27a"]), 40, true, 1.9); }
+    else if (k === "valentine") floaters(c, POP_ART.heart, 18, "up", t.css.concat(["#ffb3cf"]));
+    else if (k === "stpat") floaters(c, POP_ART.shamrock, 18, "down", ["#1f9e3a", "#8ccf4d", "#23a841"]);
+    else if (k === "halloween") floaters(c, POP_ART.ghost, 9, "up");
+    else if (k === "july4") {
+      for (var i = 0; i < 7; i++) {
+        var b = popEl("boom", POP_ART.boom);
+        b.style.left = Math.round(rnd(14, 86)) + "%"; b.style.top = Math.round(rnd(10, 62)) + "%";
+        b.style.color = t.css[i % t.css.length];
+        b.style.setProperty("--z", Math.round(rnd(110, 190)) + "px");
+        b.style.setProperty("--d", (i * .38).toFixed(2) + "s");
+        c.appendChild(b);
+      }
+    }
+    else confetti(c, t.css.concat(["#ffffff"]), 46);
   }
   c.classList.add("on");
   if (navigator.vibrate) navigator.vibrate([40, 60, 40]);
   clearTimeout(celebrate.t);
-  celebrate.t = setTimeout(function () { c.classList.remove("on"); c.innerHTML = ""; }, 3300);
+  celebrate.t = setTimeout(function () { c.className = ""; c.innerHTML = ""; }, 4300);
 }
 function themeLights(t) {
   if (!lifxReady) { say("Lights need a LIFX token", true); return Promise.resolve(false); }
   var bulbs = bulbsIn(selector);
+  // a theme may ask for a brightness too (Sunset is 50%)
+  var cols = t.lights.map(function (c) { return t.brightness ? c + " brightness:" + t.brightness : c; });
   var p;
   if (bulbs.length >= 2) {
     // more than one bulb: take turns through the theme's colors
-    var groups = t.lights.map(function () { return []; });
+    var groups = cols.map(function () { return []; });
     bulbs.forEach(function (l, i) { groups[i % groups.length].push("id:" + l.id); });
     var states = [];
-    groups.forEach(function (g, i) { if (g.length) states.push({ selector: g.join(","), color: t.lights[i] }); });
+    groups.forEach(function (g, i) { if (g.length) states.push({ selector: g.join(","), color: cols[i] }); });
     p = lifx("PUT", "/lights/states", { states: states, defaults: { power: "on", duration: 0.8 } });
   } else {
     // one bulb: slowly fade back and forth between the first two colors
     effectOn = true;
     p = lifx("POST", "/lights/" + encodeURIComponent(selector) + "/effects/breathe", {
-      color: t.lights[1], from_color: t.lights[0], period: 4, cycles: 100000, persist: true, power_on: true
+      color: cols[1], from_color: cols[0], period: 4, cycles: 100000, persist: true, power_on: true
     });
   }
   return p.then(function () { return true; }).catch(function (e) { say(e.message, true); return false; });
@@ -1389,38 +1626,32 @@ draggable($("wheel"), function (x, y, r) {
 });
 placeDot(30, 0.8);
 
-// ---------- dimmer (top = brightest) ----------
+// ---------- dimmer (left = dim, right = bright) ----------
+var dimPct = 60;
 function placeDim(pct) {
-  $("dimHandle").style.top = (100 - pct) + "%";
+  dimPct = pct;
+  $("dimHandle").style.left = pct + "%";
   $("brightVal").textContent = pct + "%";
-  // the sun grows when it's brighter and shrinks when it's dimmer
-  $("sunIcon").style.transform = "scale(" + (0.6 + pct / 400) + ")";
-  // and glows a little more the brighter it is
-  $("sunIcon").style.filter = "drop-shadow(0 0 " + (pct / 25).toFixed(1) + "px rgba(255, 200, 80, " + (0.1 + pct / 250).toFixed(2) + "))";
+  // the percent sits in whichever half the little line is not in
+  $("brightVal").classList.toggle("tr", pct <= 50);
 }
 draggable($("dimmer"), function (x, y, r) {
-  var pct = Math.round(100 - (y / r.height) * 100);
+  var pct = Math.round((x / r.width) * 100);
   pct = Math.max(1, Math.min(100, pct));
   placeDim(pct);
   queue({ brightness: pct / 100 });
 });
-placeDim(60);
-
-// ---------- warm / cool white ----------
-// Same press-and-hold as the wheel and dimmer: a swipe scrolls, a hold grabs.
-var K_MIN = 1500, K_MAX = 9000;
-function placeKelvin(k) {
-  $("kelvinHandle").style.left = ((k - K_MIN) / (K_MAX - K_MIN) * 100) + "%";
-  $("kelvinVal").textContent = k + "K";
+// the small sun and the big sun nudge it down or up to the next ten
+function nudgeDim(dir) {
+  if (needRoom()) return;
+  var pct = dir > 0 ? Math.floor(dimPct / 10) * 10 + 10 : Math.ceil(dimPct / 10) * 10 - 10;
+  pct = Math.max(1, Math.min(100, pct));
+  placeDim(pct);
+  queue({ brightness: pct / 100 });
 }
-draggable($("kelvin"), function (x, y, r) {
-  var k = K_MIN + Math.round((x / r.width) * (K_MAX - K_MIN) / 100) * 100;
-  k = Math.max(K_MIN, Math.min(K_MAX, k));
-  placeKelvin(k);
-  markPreset(null); markMode("white");
-  queue({ color: "kelvin:" + k });
-});
-placeKelvin(2700);
+$("dimDown").addEventListener("click", function () { flash(this); nudgeDim(-1); });
+$("dimUp").addEventListener("click", function () { flash(this); nudgeDim(1); });
+placeDim(60);
 
 // ---------- flame bar ----------
 // Same press-and-hold. Nothing is sent while dragging, only when you let go.
@@ -1473,6 +1704,7 @@ function startSleep(mins, endsAt, custom) {
     b.classList.toggle("on", hit); if (hit) preset = true;
   });
   $("sleepCustom").classList.toggle("on", !preset);   // a custom time glows its boxes instead
+  $("sleepRun").parentNode.classList.add("sleeping");    // hide the time buttons while it counts
   $("sleepRun").classList.remove("hidden");
   clearInterval(sleepTick);
   sleepTick = setInterval(tickSleep, 1000);
@@ -1483,6 +1715,7 @@ function stopSleep() {
   clearInterval(sleepTick); sleepTick = null;
   each("#sleepBtns button", function (b) { b.classList.remove("on"); });
   $("sleepCustom").classList.remove("on");
+  $("sleepRun").parentNode.classList.remove("sleeping");
   $("sleepRun").classList.add("hidden");
 }
 function tickSleep() {
@@ -1541,9 +1774,16 @@ $("tokenSave").addEventListener("click", function () {
     say(e.message === "LIFX token is wrong" ? "LIFX says that token is wrong" : e.message, true);
   });
 });
+// ---------- the gear (top corner) ----------
+// Opens a little card with the version number and the LIFX token button.
+$("gearBtn").addEventListener("click", function () { $("gear").classList.remove("hidden"); });
+$("gearClose").addEventListener("click", function () { $("gear").classList.add("hidden"); });
+$("gear").addEventListener("click", function (e) { if (e.target === this) this.classList.add("hidden"); });
 $("tokenChange").addEventListener("click", function () {
-  $("tokenSetup").classList.toggle("hidden");
-  if (!$("tokenSetup").classList.contains("hidden")) $("tokenSetup").scrollIntoView({ behavior: "smooth", block: "center" });
+  // the token box lives on the Lights tab, so go there and show it
+  $("gear").classList.add("hidden");
+  showTab("tabLights");
+  $("tokenSetup").classList.remove("hidden");
 });
 
 // ---------- tabs ----------
@@ -1557,6 +1797,7 @@ function showTab(id) {
   $("titleIco").setAttribute("href", lights ? "#i-bulb" : "#i-flame-face");
   window.scrollTo(0, 0);
   fitScreen();
+  if (lights) showRealLights();
 }
 
 // ---------- fit any phone ----------
