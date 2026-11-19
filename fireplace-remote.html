@@ -423,19 +423,24 @@
   @media (max-height: 907px) { #tabFire section.compact .note { display: none; } }
   /* Lights tab: the same idea. The color wheel and the dimmer shrink the most. */
   #tabLights section { padding: calc(10px + 6 * var(--s)); }
-  #tabLights h2 { margin-bottom: calc(6px + 6 * var(--s)); }
   #tabLights .pickrow { margin-bottom: calc(6px + 6 * var(--s)); }
-  #tabLights .pickrow select { padding-top: calc(9px + 3 * var(--s)); padding-bottom: calc(9px + 3 * var(--s)); }
+  #tabLights .pickrow select { font-size: 16px; padding-top: calc(7px + 3 * var(--s)); padding-bottom: calc(7px + 3 * var(--s)); }
   #tabLights .powerrow { margin-bottom: calc(6px + 6 * var(--s)); }
-  #tabLights .powerrow button { padding: calc(12px + 6 * var(--s)) 10px; }
-  #tabLights .swatches { gap: calc(8px + 2 * var(--s)); margin-bottom: calc(8px + 6 * var(--s)); }
-  #tabLights .sw { height: calc(40px + 16 * var(--s)); }
-  #tabLights .wheelwrap { max-width: calc(160px + 140 * var(--s)); }
-  #dimmer { min-height: calc(104px + 96 * var(--s)); }
+  #tabLights .powerrow button { font-size: 17px; padding: calc(9px + 4 * var(--s)) 10px; }
+  #tabLights .swatches { gap: calc(7px + 2 * var(--s)); margin-bottom: calc(8px + 6 * var(--s)); }
+  #tabLights .sw { height: calc(36px + 8 * var(--s)); font-size: 14px; border-radius: 14px; }
+  #tabLights .wheelwrap { max-width: calc(150px + 70 * var(--s)); }
+  #dimmer { width: 46px; min-height: calc(96px + 54 * var(--s)); }
+  #tabLights .colorbox { grid-template-columns: 1fr 58px; }
   #tabLights .row { margin-top: calc(6px + 8 * var(--s)); }
-  #tabLights .row label { margin-bottom: calc(5px + 3 * var(--s)); }
-  /* on the shortest screens the small "LIGHTS" label goes (the big title says it already) */
-  @media (max-height: 760px) { #tabLights h2 { display: none; } }
+  #tabLights .row label { font-size: 15px; margin-bottom: calc(5px + 3 * var(--s)); }
+  #kelvin { height: 30px; }
+  /* Used for a split second while the page measures itself (see fitScreen): the
+     Fireplace tab is measured as if the fire picture and the Safety line were
+     showing, so nothing jumps when the fire is turned on. */
+  .fitprobe #tabFire .firescene { height: calc(64px + 55 * var(--s)) !important; margin-bottom: calc(8px + 4 * var(--s)) !important; }
+  .fitprobe #safetyNote { display: block !important; min-height: 1.4em; }
+  .fitprobe .firescene, .notrans .firescene { transition: none !important; }
   /* ===== end FIT ANY PHONE ===== */
 </style>
 </head>
@@ -602,7 +607,6 @@
 
 <div class="tab hidden" id="tabLights">
 <section>
-  <h2>Lights</h2>
   <div class="hidden" id="tokenSetup">
     <p class="note">To control the lights, paste your LIFX token (from cloud.lifx.com/settings). It's saved only on this device.</p>
     <div class="tokrow">
@@ -702,7 +706,7 @@ var FIRE_ROOM = "Living Room";
 // Rooms to show if the LIFX list can't load
 var FALLBACK_ROOMS = ["Living Room", "Master bedroom", "Kids", "Office", "Garage"];
 // Bumped every time the page is changed, so you can tell when the phone has the new one.
-var APP_VERSION = "3.6";
+var APP_VERSION = "3.7";
 // ====================================================
 
 var LIFX = "https://api.lifx.com/v1";
@@ -1552,6 +1556,49 @@ function showTab(id) {
   $("titleText").textContent = lights ? "Lights" : "Fireplace";
   $("titleIco").setAttribute("href", lights ? "#i-bulb" : "#i-flame-face");
   window.scrollTo(0, 0);
+  fitScreen();
+}
+
+// ---------- fit any phone ----------
+// The page measures itself: does the last box of this tab end above the tab bar?
+// If not, it turns the "--s" size dial down (see FIT ANY PHONE in the styles)
+// until it does. 1 = full size, 0 = compact, and it may go a little below 0 on
+// very small screens. It measures again whenever the screen or the tab changes.
+function fitScreen() {
+  var FIT_MIN = -0.25;
+  var root = document.documentElement, body = document.body, bar = $("tabbar");
+  var tab = $("tabFire").classList.contains("hidden") ? $("tabLights") : $("tabFire");
+  var secs = tab.querySelectorAll("section"), last = secs[secs.length - 1];
+  if (!last || !bar.offsetHeight) return;
+  body.classList.add("fitprobe", "notrans");
+  function over(s) {
+    root.style.setProperty("--s", s + "px");
+    return last.getBoundingClientRect().bottom + window.scrollY > bar.getBoundingClientRect().top - 8;
+  }
+  var s = 1;
+  if (over(1)) {
+    if (over(FIT_MIN)) s = FIT_MIN;
+    else {
+      var lo = FIT_MIN, hi = 1;
+      for (var i = 0; i < 7; i++) { var mid = (lo + hi) / 2; if (over(mid)) hi = mid; else lo = mid; }
+      s = lo;
+    }
+  }
+  root.style.setProperty("--s", s.toFixed(3) + "px");
+  // put the fire picture back as it was, without it animating
+  body.classList.remove("fitprobe");
+  void body.offsetHeight;
+  body.classList.remove("notrans");
+}
+window.addEventListener("resize", fitScreen);
+window.addEventListener("load", fitScreen);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitScreen);
+// things that make a tab longer or shorter: the sleep countdown, the LIFX token box, the "pick a room" hint
+if (window.MutationObserver) {
+  var fitWatch = new MutationObserver(fitScreen);
+  [$("sleepRun"), $("tokenSetup"), $("tabLights").querySelector("section")].forEach(function (el) {
+    fitWatch.observe(el, { attributes: true, attributeFilter: ["class"] });
+  });
 }
 each(".tabbtn", function (b) {
   b.addEventListener("click", function () {
@@ -1764,6 +1811,7 @@ if (/[?&]saver\b/.test(location.search)) setTimeout(showSaver, 300);
 
 // ---------- start ----------
 setFlameLevel(FLAME_STEPS);
+fitScreen();
 if (!espReady) {
   $("fireNote").classList.remove("hidden");
   $("fireBtns").style.opacity = ".75";
