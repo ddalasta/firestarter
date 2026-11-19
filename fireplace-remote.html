@@ -396,6 +396,32 @@
   button.on:active { box-shadow: 0 1px 0 rgba(0,0,0,.75), 0 0 4px 0 var(--glow), 0 0 12px 2px var(--glow-soft); }
   button .ico { position: relative; z-index: 1; }
   /* ===== end 3D BUTTONS ===== */
+
+  /* ===== FIT ANY PHONE =====
+     The Fireplace tab should show every button without scrolling, also on
+     shorter screens. --s is a "how tall is this screen" dial: 1px on a tall
+     phone (908 or more tall: nothing changes), sliding down to 0px on a short
+     one (700 or less). Every size below is "small size + extra * dial", so the
+     gaps, the buttons and the fire picture all shrink together, smoothly. */
+  :root { --s: clamp(0px, calc((100vh - 700px) / 208), 1px); }
+  @supports (height: 100dvh) { :root { --s: clamp(0px, calc((100dvh - 700px) / 208), 1px); } }
+  h1 { font-size: calc(20px + 6 * var(--s)); margin: calc(4 * var(--s)) 0 calc(6px + 8 * var(--s)); }
+  #tabFire section { padding: calc(10px + 6 * var(--s)); margin-bottom: calc(8px + 6 * var(--s)); }
+  #tabFire section.compact { padding: calc(8px + 4 * var(--s)) calc(10px + 4 * var(--s)); }
+  #tabFire h2 { margin-bottom: calc(6px + 6 * var(--s)); }
+  #tabFire section.compact h2 { margin-bottom: calc(4px + 4 * var(--s)); }
+  #tabFire button.scene { padding: calc(13px + 9 * var(--s)) 10px; }
+  #tabFire .firescene.show { height: calc(64px + 55 * var(--s)); margin-bottom: calc(8px + 4 * var(--s)); }
+  #tabFire .fireswitch button { padding: calc(12px + 6 * var(--s)) 10px; }
+  #tabFire .flamerow { margin-top: calc(8px + 6 * var(--s)); }
+  #tabFire .fbtn { width: calc(40px + 6 * var(--s)); height: calc(40px + 6 * var(--s)); }
+  #safetyNote { margin: calc(6px + 6 * var(--s)) 0 0; }
+  #sleepBtns button { padding: calc(8px + 3 * var(--s)) 8px; }
+  #tabFire .customrow { margin-top: calc(6px + 4 * var(--s)); }
+  #tabFire section.compact .sleeprow { margin-top: calc(6px + 4 * var(--s)); }
+  /* the sleep timer's explaining line only shows where there is room for it */
+  @media (max-height: 907px) { #tabFire section.compact .note { display: none; } }
+  /* ===== end FIT ANY PHONE ===== */
 </style>
 </head>
 <body>
@@ -535,7 +561,7 @@
       <button class="fbtn" data-fire="flame_up" aria-label="Flame up"><svg class="ico flame"><use href="#i-flame"/></svg></button>
     </div>
   </div>
-  <p class="note hidden" id="safetyNote" style="margin:12px 0 0"></p>
+  <p class="note hidden" id="safetyNote"></p>
 </section>
 
 <section class="compact">
@@ -661,7 +687,7 @@ var FIRE_ROOM = "Living Room";
 // Rooms to show if the LIFX list can't load
 var FALLBACK_ROOMS = ["Living Room", "Master bedroom", "Kids", "Office", "Garage"];
 // Bumped every time the page is changed, so you can tell when the phone has the new one.
-var APP_VERSION = "3.4";
+var APP_VERSION = "3.5";
 // ====================================================
 
 var LIFX = "https://api.lifx.com/v1";
