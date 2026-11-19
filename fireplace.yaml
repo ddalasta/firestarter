@@ -119,11 +119,24 @@ globals:
     type: int
     restore_value: yes
     initial_value: "${flame_steps}"
+  # Where a "move the flame to here" is heading (0..flame_steps), or -1 when the
+  # box is not moving the flame. The box then sends one tap about every second.
+  - id: flame_goal
+    type: int
+    restore_value: no
+    initial_value: "-1"
+  # Extra taps sent after reaching the very top or bottom, so the real valve
+  # hits its end stop and the count lines up with it again.
+  - id: extra_taps
+    type: int
+    restore_value: no
+    initial_value: "0"
 
 # One line the phones read every few seconds, e.g.
-# "safety=222;on_wait=45;flame_wait=0;light=60;level=23;steps=23"
+# "safety=222;on_wait=45;flame_wait=0;light=60;level=23;steps=23;goal=-1"
 # (light = how many seconds lighting takes, for the phones' lighting animation;
-#  level / steps = the flame level count and its highest value)
+#  level / steps = the flame level count and its highest value;
+#  goal = the level the box is moving the flame to, -1 when it isn't)
 text_sensor:
   - platform: template
     name: "fire_status"
@@ -150,6 +163,30 @@ number:
     optimistic: true
     restore_value: true
     initial_value: 0
+  # "Move the flame to this level." The phones set it when someone drags the
+  # flame bar: POST /number/flame_target/set?value=12. Ignored while the fire
+  # is lighting or while the box thinks the fire is off.
+  - platform: template
+    name: "flame_target"
+    id: flame_target
+    icon: "mdi:fire"
+    min_value: 0
+    max_value: ${flame_steps}
+    step: 1
+    set_action:
+      - lambda: |-
+          float mins = id(safety_minutes_left).state;
+          if (id(flame_wait_s) > 0 || std::isnan(mins) || mins < 1) {
+            ESP_LOGW("flame", "Move ignored: fire is off or still lighting");
+            return;
+          }
+          int goal = (int) (x + 0.5f);
+          if (goal < 0) goal = 0;
+          if (goal > ${flame_steps}) goal = ${flame_steps};
+          id(flame_goal) = goal;
+          id(extra_taps) = (goal == 0 || goal == ${flame_steps}) ? 3 : 0;
+          id(flame_target).publish_state(goal);
+          id(publish_status).execute();
 
 interval:
   - interval: 1s
@@ -157,6 +194,27 @@ interval:
       - lambda: |-
           if (id(on_wait_s) > 0) id(on_wait_s)--;
           if (id(flame_wait_s) > 0) id(flame_wait_s)--;
+          id(publish_status).execute();
+  # Moving the flame to a level: one tap at a time, until the count gets there
+  - interval: 1100ms
+    then:
+      - lambda: |-
+          if (id(flame_goal) < 0) return;
+          float mins = id(safety_minutes_left).state;
+          if (id(flame_wait_s) > 0 || std::isnan(mins) || mins < 1) {
+            id(flame_goal) = -1; id(extra_taps) = 0;
+            id(publish_status).execute();
+            return;
+          }
+          if (millis() - id(last_flame_ms) < ${flame_gap_ms}) return;
+          bool up;
+          if (id(flame_level) < id(flame_goal)) up = true;
+          else if (id(flame_level) > id(flame_goal)) up = false;
+          else if (id(extra_taps) > 0) { id(extra_taps)--; up = id(flame_goal) > 0; }
+          else { id(flame_goal) = -1; id(publish_status).execute(); return; }
+          id(last_flame_ms) = millis();
+          if (up) id(flame_step_up).execute(); else id(flame_step_down).execute();
+          if (id(flame_level) == id(flame_goal) && id(extra_taps) == 0) id(flame_goal) = -1;
           id(publish_status).execute();
   - interval: 1min
     then:
@@ -177,10 +235,43 @@ script:
       - lambda: |-
           float mins = id(safety_minutes_left).state;
           char buf[112];
-          snprintf(buf, sizeof(buf), "safety=%d;on_wait=%d;flame_wait=%d;light=%d;level=%d;steps=%d",
+          snprintf(buf, sizeof(buf), "safety=%d;on_wait=%d;flame_wait=%d;light=%d;level=%d;steps=%d;goal=%d",
                    std::isnan(mins) ? 0 : (int) mins, id(on_wait_s), id(flame_wait_s), ${wait_after_on},
-                   id(flame_level), ${flame_steps});
+                   id(flame_level), ${flame_steps}, id(flame_goal));
           if (id(fire_status).state != buf) id(fire_status).publish_state(buf);
+  # One flame tap up / down: moves the count one step (it stops at the ends like
+  # the real valve) and sends the signal. Used by the Flame up / down buttons
+  # and by the box itself when it is moving the flame to a level.
+  - id: flame_step_up
+    mode: single
+    then:
+      - lambda: |-
+          if (id(flame_level) < ${flame_steps}) id(flame_level)++;
+      - remote_transmitter.transmit_raw:
+          transmitter_id: rf_tx
+          # Captured 2026-11-17 (same timing as Off, different ending)
+          code: [320, -630, 630, -310, 630, -310, 630, -310, 630, -310, 630, -310,
+                 630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 630, -310,
+                 630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 630, -310,
+                 630, -310, 630, -310, 320, -630, 630, -310, 630]
+          repeat:
+            times: 10
+            wait_time: 32ms
+  - id: flame_step_down
+    mode: single
+    then:
+      - lambda: |-
+          if (id(flame_level) > 0) id(flame_level)--;
+      - remote_transmitter.transmit_raw:
+          transmitter_id: rf_tx
+          # Captured 2026-11-17
+          code: [320, -630, 630, -310, 630, -310, 630, -310, 630, -310, 630, -310,
+                 630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 630, -310,
+                 630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 320, -630,
+                 320, -630, 320, -630, 320, -630, 320, -630, 320]
+          repeat:
+            times: 10
+            wait_time: 32ms
   - id: safety_shutoff
     mode: single
     then:
@@ -205,6 +296,7 @@ button:
           if (!(id(off_wait) && id(on_wait_s) > 0)) id(on_wait_s) = ${wait_after_off};
           id(off_wait) = true;
           id(flame_wait_s) = 0;
+          id(flame_goal) = -1; id(extra_taps) = 0;
       - number.set:
           id: safety_minutes_left
           value: 0
@@ -239,6 +331,7 @@ button:
                 id(off_wait) = false;
                 id(flame_wait_s) = ${wait_after_on};
                 id(flame_level) = ${flame_steps};   // lighting runs the flame to full
+                id(flame_goal) = -1; id(extra_taps) = 0;
             - number.set:
                 id: safety_minutes_left
                 value: 240          # start the 4-hour safety countdown
@@ -262,23 +355,20 @@ button:
       - if:
           condition:
             lambda: |-
+              // a tap by hand while the box is moving the flame just stops the move
+              if (id(flame_goal) >= 0) {
+                id(flame_goal) = -1; id(extra_taps) = 0;
+                id(publish_status).execute();
+                return false;
+              }
               if (id(flame_wait_s) > 0) return false;
               if (millis() - id(last_flame_ms) < ${flame_gap_ms}) return false;
               id(last_flame_ms) = millis();
-              if (id(flame_level) < ${flame_steps}) id(flame_level)++;
               return true;
           then:
+            - script.execute: flame_step_up
             - script.execute: publish_status
-            - remote_transmitter.transmit_raw:
-                transmitter_id: rf_tx
-                # Captured 2026-11-17 (same timing as Off, different ending)
-                code: [320, -630, 630, -310, 630, -310, 630, -310, 630, -310, 630, -310,
-                       630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 630, -310,
-                       630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 630, -310,
-                       630, -310, 630, -310, 320, -630, 630, -310, 630]
-                repeat:
-                  times: 10
-                  wait_time: 32ms
+
 
   - platform: template
     name: "flame_down"
@@ -287,20 +377,16 @@ button:
       - if:
           condition:
             lambda: |-
+              // a tap by hand while the box is moving the flame just stops the move
+              if (id(flame_goal) >= 0) {
+                id(flame_goal) = -1; id(extra_taps) = 0;
+                id(publish_status).execute();
+                return false;
+              }
               if (id(flame_wait_s) > 0) return false;
               if (millis() - id(last_flame_ms) < ${flame_gap_ms}) return false;
               id(last_flame_ms) = millis();
-              if (id(flame_level) > 0) id(flame_level)--;
               return true;
           then:
+            - script.execute: flame_step_down
             - script.execute: publish_status
-            - remote_transmitter.transmit_raw:
-                transmitter_id: rf_tx
-                # Captured 2026-11-17
-                code: [320, -630, 630, -310, 630, -310, 630, -310, 630, -310, 630, -310,
-                       630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 630, -310,
-                       630, -310, 630, -310, 630, -310, 630, -310, 320, -630, 320, -630,
-                       320, -630, 320, -630, 320, -630, 320, -630, 320]
-                repeat:
-                  times: 10
-                  wait_time: 32ms

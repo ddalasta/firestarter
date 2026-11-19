@@ -75,13 +75,39 @@
   button.off { background: #2c2c31; }
   /* a button the box is making wait (cooldown): dim, and it shows a countdown */
   button.wait { opacity: .45; filter: saturate(.4); }
-  /* flame level: a thin bar under the flame buttons, shown while the fire is on */
-  .flamebar { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 15px; color: var(--muted); }
-  .flamebar.hidden { display: none; }
-  .fbtrack { flex: 1; height: 10px; border-radius: 5px; background: var(--panel-2); border: 1px solid var(--line); overflow: hidden; }
-  .fbfill { height: 100%; width: 100%; border-radius: 5px; background: linear-gradient(90deg, var(--fire), var(--fire-2));
+  /* fire on/off: one switch with two halves */
+  .fireswitch { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+  .fireswitch button:first-child { border-radius: 16px 5px 5px 16px; }
+  .fireswitch button:last-child { border-radius: 5px 16px 16px 5px; }
+  .fireswitch button.on { z-index: 1; }
+  /* flame row: small flame-down button, the drag bar, small flame-up button */
+  .flamerow { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+  .fbtn { flex: none; width: 46px; height: 46px; padding: 0; border-radius: 50%; font-size: 17px; }
+  /* the bar: orange up to the little line. Press and hold, then drag (like the lights) */
+  .fbtrack { position: relative; flex: 1; min-width: 0; height: 34px; border-radius: 12px; background: var(--panel-2);
+    box-shadow: 0 0 0 2px var(--line); touch-action: pan-y; cursor: ew-resize; -webkit-touch-callout: none;
+    transition: opacity .3s; }
+  .fbclip { position: absolute; inset: 0; border-radius: 12px; overflow: hidden; }
+  .fbfill { height: 100%; width: 100%; background: linear-gradient(90deg, var(--fire), var(--fire-2));
     transition: width .5s ease; }
-  .flamebar b { min-width: 3.4em; text-align: right; color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+  /* the words sit in whichever half of the bar the little line is not in */
+  #flameTxt.tl { justify-content: flex-start; padding-left: 14px; }
+  #flameTxt.tr { justify-content: flex-end; padding-right: 14px; }
+  #flameTxt { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; color: #fff; pointer-events: none;
+    text-shadow: 0 1px 2px rgba(0,0,0,.85), 0 0 6px rgba(0,0,0,.6); }
+  #flameHandle { position: absolute; top: -6px; bottom: -6px; width: 12px; margin-left: -6px; border-radius: 6px;
+    background: #fff; border: 2px solid rgba(0,0,0,.6); box-shadow: 0 2px 6px rgba(0,0,0,.6); pointer-events: none;
+    transition: left .5s ease, opacity .3s; }
+  .fbtrack.grab { box-shadow: 0 0 0 3px var(--glow), 0 0 24px 8px var(--glow-soft); }
+  .fbtrack.grab #flameHandle { transition: none; }
+  /* the box is moving the flame: the line waits (faint) where you let go, the orange creeps to it */
+  .fbtrack.moving #flameHandle { opacity: .5; transition: opacity .3s; }
+  /* fire off: grey, can't be dragged.  still lighting: dim */
+  .fbtrack.off { cursor: default; }
+  .fbtrack.off .fbfill, .fbtrack.off #flameHandle { opacity: 0; }
+  .fbtrack.off #flameTxt { color: var(--muted); text-shadow: none; }
+  .fbtrack.wait { opacity: .45; }
   button.scene { padding: 22px 10px; font-size: 20px; }
 
   /* room / bulb chips */
@@ -252,11 +278,7 @@
   .firescene { height: 0; opacity: 0; overflow: hidden; border-radius: 14px;
     background: radial-gradient(ellipse at 50% 100%, #2a1206 0%, #120a05 60%, #0b0806 100%);
     transition: height .6s ease, opacity .6s ease, margin .6s ease; }
-  .firescene.show { height: 72px; opacity: 1; }
-  /* "FIREPLACE" label on the left, the fire scene fills the rest of that line */
-  .firehead { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-  .firehead h2 { margin: 0; flex: none; }
-  .firescene { flex: 1; min-width: 0; }
+  .firescene.show { height: 119px; opacity: 1; margin-bottom: 12px; }
   .firescene svg { width: 100%; height: 100%; display: block; }
   .fx { transform-box: fill-box; transform-origin: 50% 100%; }
   .f1 { animation: flicker 1.3s ease-in-out infinite; }
@@ -442,8 +464,6 @@
 
 
 <section>
-  <div class="firehead">
-  <h2>Fireplace</h2>
   <div class="firescene" id="fireScene" aria-hidden="true">
     <svg viewBox="0 0 200 100" preserveAspectRatio="xMidYMax meet">
       <defs>
@@ -497,18 +517,23 @@
       </g>
     </svg>
   </div>
-  </div>
   <p class="note hidden" id="fireNote">Fireplace isn't set up yet. It will work once the little box is built.</p>
-  <div class="grid g2" id="fireBtns">
-    <button class="fire" data-fire="fire_on">Fire on</button>
-    <button class="off" data-fire="fire_off">Fire off</button>
-    <button data-fire="flame_up"><svg class="ico flame"><use href="#i-flame"/></svg> Flame up</button>
-    <button data-fire="flame_down"><svg class="ico flame down"><use href="#i-flame"/></svg> Flame down</button>
-  </div>
-  <div class="flamebar hidden" id="flameBar">
-    <span>Flame level</span>
-    <div class="fbtrack"><div class="fbfill" id="flameFill"></div></div>
-    <b id="flameTxt"></b>
+  <div id="fireBtns">
+    <!-- one switch with two halves: Off is always there to tap -->
+    <div class="fireswitch">
+      <button class="fire" data-fire="fire_on">Fire on</button>
+      <button class="off" data-fire="fire_off">Fire off</button>
+    </div>
+    <!-- flame down, the bar you press-and-hold then drag, flame up -->
+    <div class="flamerow">
+      <button class="fbtn" data-fire="flame_down" aria-label="Flame down"><svg class="ico flame down"><use href="#i-flame"/></svg></button>
+      <div class="fbtrack off" id="flameBar">
+        <div class="fbclip"><div class="fbfill" id="flameFill"></div></div>
+        <span id="flameTxt"></span>
+        <div id="flameHandle"></div>
+      </div>
+      <button class="fbtn" data-fire="flame_up" aria-label="Flame up"><svg class="ico flame"><use href="#i-flame"/></svg></button>
+    </div>
   </div>
   <p class="note hidden" id="safetyNote" style="margin:12px 0 0"></p>
 </section>
@@ -636,7 +661,7 @@ var FIRE_ROOM = "Living Room";
 // Rooms to show if the LIFX list can't load
 var FALLBACK_ROOMS = ["Living Room", "Master bedroom", "Kids", "Office", "Garage"];
 // Bumped every time the page is changed, so you can tell when the phone has the new one.
-var APP_VERSION = "3.3";
+var APP_VERSION = "3.4";
 // ====================================================
 
 var LIFX = "https://api.lifx.com/v1";
@@ -768,6 +793,13 @@ each("[data-fire]", function (b) {
       say("Fire on is resting. Ready in " + mmss(boxWait("on")), true); return;
     }
     if (id === "flame_up" || id === "flame_down") {
+      // while the box is moving the flame to a spot, a tap just stops it there
+      if (flameGoal >= 0) {
+        flameGoal = -1; lastGoalSet = Date.now(); drawFlame();
+        flash(b); fire(id).then(function (ok) { if (ok) say("Stopped"); });
+        setTimeout(syncFromBox, 1600);
+        return;
+      }
       if (boxWait("flame") > 0) { say("Still lighting. Flame buttons work in " + mmss(boxWait("flame")), true); return; }
       if (Date.now() - lastFlameTap < FLAME_GAP) return;   // too fast: the box would skip it too
       lastFlameTap = Date.now();
@@ -917,6 +949,7 @@ function showWaits() {
   b.classList.toggle("wait", on > 0);
   b.textContent = on > 0 ? "Ready in " + mmss(on) : "Fire on";
   each('[data-fire="flame_up"], [data-fire="flame_down"]', function (x) { x.classList.toggle("wait", fl > 0); });
+  $("flameBar").classList.toggle("wait", fl > 0);
 }
 setInterval(showWaits, 1000);
 
@@ -932,7 +965,7 @@ function readBox() {
         var o = {};
         v.split(";").forEach(function (kv) { var p = kv.split("="); o[p[0]] = parseFloat(p[1]); });
         return { mins: o.safety, on: o.on_wait || 0, flame: o.flame_wait || 0, light: o.light || 60, live: true,
-                 level: o.level, steps: o.steps };
+                 level: o.level, steps: o.steps, goal: o.goal };
       }
       return fetch("/number/safety_minutes_left", { cache: "no-store" })
         .then(function (r) { return r.ok ? r.json() : null; })
@@ -954,7 +987,13 @@ function syncFromBox() {
       // the flame level is the box's count (right after a tap here, trust the tap for a moment)
       if (st.steps > 0 && !isNaN(st.level)) {
         boxHasLevel = true;
+        // same for a move: right after letting go of the bar here, trust that for a moment
+        if (Date.now() - lastGoalSet > 1500) flameGoal = st.goal >= 0 ? st.goal : -1;
         if (Date.now() - lastFlameTap > 1500) { FLAME_STEPS = st.steps; setFlameLevel(st.level); }
+        else drawFlame();
+        // while the box is moving the flame, ask every second so the bar creeps along
+        clearTimeout(moveTimer);
+        if (flameGoal >= 0) moveTimer = setTimeout(syncFromBox, 1000);
       }
       // right after a press on this phone, trust the press until the box catches up
       if (Date.now() - lastFirePress > 3000) markFire(st.mins >= 1 ? "fire_on" : "fire_off");
@@ -981,17 +1020,56 @@ try { if (ON_BOX && window.source && window.source.close) window.source.close();
 // lighting = highest, and each Flame up / down it sends moves the count one
 // step (FLAME_STEPS taps from top to bottom). Every phone shows the box's
 // count as a bar, and the pretend fire grows and shrinks with it.
+//
+// The bar can be dragged (press and hold first, like the light controls). Letting
+// go tells the box "move the flame to here"; the box then sends one tap about
+// every second until its count gets there. While that happens the little line
+// waits where you let go and the orange creeps toward it.
 var FLAME_STEPS = 23, flameLevel = 23;
 var boxHasLevel = false;      // true once the box has told us its count
+var flameOn = false;          // the box says the fire is on, so the bar is live
+var flameGoal = -1;           // level the box is moving the flame to (-1 = it isn't)
+var flameDrag = -1;           // level under the finger while dragging (-1 = not dragging)
+var lastGoalSet = 0, moveTimer = null;
+function levelWord(n) {
+  return n >= FLAME_STEPS ? "Full" : n <= 0 ? "Lowest" : Math.round(n / FLAME_STEPS * 100) + "%";
+}
+function drawFlame() {
+  var bar = $("flameBar"), live = boxHasLevel && flameOn;
+  var lineAt = flameDrag >= 0 ? flameDrag : flameGoal >= 0 ? flameGoal : flameLevel;
+  $("flameGroup").style.transform = "scale(" + (0.4 + flameLevel / FLAME_STEPS * 0.7) + ")";
+  $("flameFill").style.width = (flameLevel / FLAME_STEPS * 100) + "%";
+  $("flameHandle").style.left = (lineAt / FLAME_STEPS * 100) + "%";
+  bar.classList.toggle("off", !live);
+  bar.classList.toggle("moving", live && flameDrag < 0 && flameGoal >= 0);
+  $("flameTxt").classList.toggle("tl", live && lineAt > FLAME_STEPS / 2);
+  $("flameTxt").classList.toggle("tr", live && lineAt <= FLAME_STEPS / 2);
+  $("flameTxt").textContent = !live ? "Flame"
+    : flameDrag >= 0 ? levelWord(flameDrag)
+    : flameGoal >= 0 ? "Moving to " + levelWord(flameGoal)
+    : levelWord(flameLevel);
+}
 function setFlameLevel(n) {
   flameLevel = Math.max(0, Math.min(FLAME_STEPS, n));
-  var part = flameLevel / FLAME_STEPS;
-  $("flameGroup").style.transform = "scale(" + (0.4 + part * 0.7) + ")";
-  $("flameFill").style.width = Math.max(4, Math.round(part * 100)) + "%";
-  $("flameTxt").textContent = flameLevel >= FLAME_STEPS ? "Full" : flameLevel <= 0 ? "Lowest" : Math.round(part * 100) + "%";
+  drawFlame();
 }
 function showFlameBar(fireOn) {
-  $("flameBar").classList.toggle("hidden", !(boxHasLevel && fireOn));
+  flameOn = fireOn;
+  if (!fireOn) { flameGoal = -1; flameDrag = -1; }
+  drawFlame();
+}
+// asks the box to move the flame to level n (0 = lowest, FLAME_STEPS = full)
+function moveFlameTo(n) {
+  flameGoal = n; lastGoalSet = Date.now(); drawFlame();
+  markScene(null);
+  fetch(ESP + "/number/flame_target/set?value=" + n, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body: "1" })
+    .then(function () { say("Flame: moving to " + levelWord(n).toLowerCase()); setTimeout(syncFromBox, 1600); })
+    .catch(function () { flameGoal = -1; drawFlame(); say("Can't reach the fireplace box", true); });
+}
+function flameBarBlocked(quiet) {
+  if (!(boxHasLevel && flameOn)) { if (!quiet) say("Turn the fire on first", true); return true; }
+  if (boxWait("flame") > 0) { if (!quiet) say("Still lighting. Ready in " + mmss(boxWait("flame")), true); return true; }
+  return false;
 }
 function markScene(id) {
   $("cozy").classList.toggle("on", id === "cozy");
@@ -1197,19 +1275,27 @@ function themeLights(t) {
 // Mouse: click and drag right away.
 // Finger: a quick swipe just scrolls the page. Press and HOLD for a moment, and the
 // control "grabs" (it glows and the phone buzzes), then dragging changes the lights.
+// opts (all optional, the light controls don't use them):
+//   blocked()  -> true when it can't be changed right now (it says why itself)
+//   hintOk()   -> true when a quick tap should get the "Press and hold" hint
+//   onEnd(cancelled) -> called when the finger / mouse lets go after a drag
 var HOLD_MS = 400, MOVE_SLOP = 10;
-function draggable(el, onMove) {
+function draggable(el, onMove, opts) {
+  opts = opts || {};
+  var blocked = opts.blocked || needRoom;
+  var hintOk = opts.hintOk || function () { return !!selector; };
+  function done(cancelled) { if (opts.onEnd) opts.onEnd(cancelled); }
   function at(p) { var r = el.getBoundingClientRect(); onMove(p.clientX - r.left, p.clientY - r.top, r); }
   // mouse / pen
   var dragging = false;
   el.addEventListener("pointerdown", function (e) {
     if (e.pointerType === "touch") return;
-    if (needRoom()) return;
+    if (blocked()) return;
     dragging = true; el.setPointerCapture(e.pointerId); at(e); e.preventDefault();
   });
   el.addEventListener("pointermove", function (e) { if (dragging && e.pointerType !== "touch") at(e); });
-  el.addEventListener("pointerup", function () { dragging = false; });
-  el.addEventListener("pointercancel", function () { dragging = false; });
+  el.addEventListener("pointerup", function () { if (dragging) { dragging = false; done(false); } });
+  el.addEventListener("pointercancel", function () { if (dragging) { dragging = false; done(true); } });
   // touch
   var timer = null, grabbed = false, moved = false, sx = 0, sy = 0, lastT = null;
   function end() { clearTimeout(timer); timer = null; grabbed = false; el.classList.remove("grab"); }
@@ -1219,7 +1305,7 @@ function draggable(el, onMove) {
     clearTimeout(timer);
     timer = setTimeout(function () {
       if (moved) return;
-      if (needRoom()) return;
+      if (blocked()) return;
       grabbed = true; el.classList.add("grab");
       if (navigator.vibrate) navigator.vibrate(15);
       at(lastT);
@@ -1231,10 +1317,10 @@ function draggable(el, onMove) {
     if (Math.abs(t.clientX - sx) > MOVE_SLOP || Math.abs(t.clientY - sy) > MOVE_SLOP) { moved = true; clearTimeout(timer); }
   }, { passive: false });
   el.addEventListener("touchend", function () {
-    if (!grabbed && !moved && timer && selector) say("Press and hold to change");
-    end();
+    if (!grabbed && !moved && timer && hintOk()) say("Press and hold to change");
+    var was = grabbed; end(); if (was) done(false);
   });
-  el.addEventListener("touchcancel", end);
+  el.addEventListener("touchcancel", function () { var was = grabbed; end(); if (was) done(true); });
   el.addEventListener("contextmenu", function (e) { e.preventDefault(); });
 }
 
@@ -1290,6 +1376,21 @@ draggable($("kelvin"), function (x, y, r) {
   queue({ color: "kelvin:" + k });
 });
 placeKelvin(2700);
+
+// ---------- flame bar ----------
+// Same press-and-hold. Nothing is sent while dragging, only when you let go.
+draggable($("flameBar"), function (x, y, r) {
+  flameDrag = Math.max(0, Math.min(FLAME_STEPS, Math.round(x / r.width * FLAME_STEPS)));
+  drawFlame();
+}, {
+  blocked: function () { return flameBarBlocked(false); },
+  hintOk: function () { return !flameBarBlocked(true); },
+  onEnd: function (cancelled) {
+    var n = flameDrag; flameDrag = -1;
+    if (cancelled || n < 0 || flameBarBlocked(true)) { drawFlame(); return; }
+    moveFlameTo(n);
+  }
+});
 
 // ---------- scenes ----------
 $("cozy").addEventListener("click", function () {
